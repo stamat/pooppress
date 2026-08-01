@@ -94,6 +94,22 @@
       </div>
 
       <div class="card p-3">
+        <h2 class="mb-2">Taxonomy</h2>
+        {% for tax in taxonomies %}
+          <label class="label" for="{{ tax.field }}">{{ tax.field | capitalize }}</label>
+          {# Comma-separated, with a datalist of terms already in use so the
+             same term doesn't get re-typed three slightly different ways. #}
+          <input class="input {% if not loop.last %}mb-3{% endif %}" id="{{ tax.field }}" name="{{ tax.field }}"
+                 list="{{ tax.field }}-known" placeholder="comma, separated" @input="dirty = true"
+                 value="{{ tax.value }}">
+          <datalist id="{{ tax.field }}-known">
+            {% for term in tax.known %}<option value="{{ term }}"></option>{% endfor %}
+          </datalist>
+        {% endfor %}
+        <p class="mt-2 text-xs text-slate-500">Each term gets its own page under the collection. Standalone pages have no term pages.</p>
+      </div>
+
+      <div class="card p-3">
         <h2 class="mb-2">Location</h2>
         <label class="label" for="collection_id">Collection</label>
         <select class="input mb-3" id="collection_id" name="collection_id" @change="dirty = true">

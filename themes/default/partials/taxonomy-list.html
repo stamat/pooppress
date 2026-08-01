@@ -1,0 +1,19 @@
+{# Every term in the collection, on every page of it. page.taxonomies is
+   [{ name, path, label, terms: [{ term, slug, url, count }] }]. #}
+{% if page.taxonomies and page.taxonomies.length %}
+  <div class="taxonomies">
+    {% for tax in page.taxonomies %}
+      <section class="taxonomy">
+        <h2>{{ tax.name | capitalize }}</h2>
+        <ul class="terms">
+          {% for term in tax.terms %}
+            <li>
+              <a class="term {% if page.termSlug == term.slug and page.taxonomy == tax.path %}is-active{% endif %}"
+                 href="{{ relativePathPrefix }}{{ term.url }}">{{ term.term }} <span class="term-count">{{ term.count }}</span></a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endfor %}
+  </div>
+{% endif %}

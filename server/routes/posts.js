@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { posts, collections } from '../queries.js'
-import { requireSlug, requireOneOf, toTimestamp, metaFromForm, ValidationError } from '../validate.js'
+import { requireSlug, requireOneOf, toTimestamp, metaFromForm, termList, TAXONOMIES, ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
 import { nowSql } from '../db.js'
 import { canPublish } from '../auth.js'
@@ -58,6 +58,17 @@ function fieldsFromBody(rawBody, { partial = false } = {}) {
     fields.meta = meta
   }
 
+  // Same deal for the taxonomy fields: their own form controls, but the value
+  // lives in meta, which is what puts them in front matter for poops to group on.
+  for (const { field } of TAXONOMIES) {
+    if (body[field] === undefined) continue
+    const meta = { ...(fields.meta || {}) }
+    const terms = termList(body[field])
+    if (terms.length) meta[field] = terms
+    else delete meta[field]
+    fields.meta = meta
+  }
+
   if (!partial) {
     if (fields.slug === undefined) fields.slug = requireSlug(body.slug)
     fields.title = fields.title ?? ''
@@ -75,15 +86,35 @@ function asValidationError(err) {
   return err
 }
 
+// The taxonomy filter travels as one "field:term" param so it fits one <select>
+// (and one pagination link) the way status and collection already do. An
+// unknown field drops the filter rather than erroring — it can only come from
+// a hand-edited URL, and "everything" is the honest answer to a meaningless one.
+function termFilter(value) {
+  const [field, ...rest] = String(value || '').split(':')
+  const term = rest.join(':')
+  if (!term || !TAXONOMIES.some((tax) => tax.field === field)) return {}
+  return { taxonomy: field, term }
+}
+
+// The list's Terms column: every term on a post, flattened across taxonomies,
+// each carrying the filter value that shows the rest of its term.
+function rowTerms(post) {
+  return TAXONOMIES.flatMap((tax) => termList(post.meta?.[tax.field])
+    .map((term) => ({ term, filter: `${tax.field}:${term}` })))
+}
+
 function listView(req) {
-  const { search = '', status = '', collection_id = '', page = 1 } = req.query
+  const { search = '', status = '', collection_id = '', term = '', page = 1 } = req.query
   // Authors see only their own posts — enforced here, not hidden in the UI.
   const author_id = canPublish(req.user) ? undefined : req.user.id
-  const result = posts.list({ search, status, collection_id, author_id, page, limit: 20 })
+  const result = posts.list({ search, status, collection_id, author_id, page, limit: 20, ...termFilter(term) })
   return {
     ...result,
-    query: { search, status, collection_id, page: Number(page) },
+    rows: result.rows.map((post) => ({ ...post, terms: rowTerms(post) })),
+    query: { search, status, collection_id, term, page: Number(page) },
     collections: collections.all(),
+    taxonomies: TAXONOMIES.map((tax) => ({ ...tax, known: posts.terms(tax.field) })),
     statuses: STATUSES
   }
 }
@@ -95,6 +126,13 @@ function editorView(req, post, extra = {}) {
     collections: collections.all(),
     statuses: canPublish(req.user) ? STATUSES : AUTHOR_STATUSES,
     canPublish: canPublish(req.user),
+    // `value` falls back to the raw body field so a 422 re-render doesn't drop
+    // what the user typed — on that path meta hasn't been rebuilt yet.
+    taxonomies: TAXONOMIES.map((tax) => ({
+      ...tax,
+      known: posts.terms(tax.field),
+      value: termList(post?.meta?.[tax.field] ?? post?.[tax.field]).join(', ')
+    })),
     ...extra
   }
 }
@@ -198,9 +236,9 @@ export function postRoutes() {
   // --- JSON API ---------------------------------------------------------
 
   router.get('/api/posts', (req, res) => {
-    const { search = '', status = '', collection_id = '', page = 1, limit = 20 } = req.query
+    const { search = '', status = '', collection_id = '', term = '', page = 1, limit = 20 } = req.query
     const author_id = canPublish(req.user) ? undefined : req.user.id
-    res.json(posts.list({ search, status, collection_id, author_id, page, limit: Math.min(Math.max(Number(limit) || 20, 1), 100) }))
+    res.json(posts.list({ search, status, collection_id, author_id, page, ...termFilter(term), limit: Math.min(Math.max(Number(limit) || 20, 1), 100) }))
   })
 
   router.get('/api/posts/:id', (req, res) => {

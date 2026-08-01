@@ -22,6 +22,20 @@
       <option value="{{ collection.id }}" {% if query.collection_id == collection.id | string %}selected{% endif %}>{{ collection.name }}</option>
     {% endfor %}
   </select>
+  {# One select for both taxonomies: the value carries the field, so the option
+     groups stay distinct without a second control. #}
+  <select class="input w-40" name="term">
+    <option value="">All terms</option>
+    {% for tax in taxonomies %}
+      {% if tax.known.length %}
+        <optgroup label="{{ tax.field | capitalize }}">
+          {% for known in tax.known %}
+            <option value="{{ tax.field }}:{{ known }}" {% if query.term == tax.field ~ ':' ~ known %}selected{% endif %}>{{ known }}</option>
+          {% endfor %}
+        </optgroup>
+      {% endif %}
+    {% endfor %}
+  </select>
   <noscript><button class="btn" type="submit">Filter</button></noscript>
 </form>
 

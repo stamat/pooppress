@@ -5,6 +5,7 @@ import path from 'node:path'
 import yaml from 'js-yaml'
 import { posts, collections, settings } from '../queries.js'
 import { SITE_ROOT, OUTPUT_DIR, UPLOADS_DIR, PREVIEWS_DIR, themeDir, themeManifest } from '../config.js'
+import { TAXONOMIES, slugify } from '../validate.js'
 import { randomBytes } from 'node:crypto'
 import { stripRawHtml } from './sanitize.js'
 
@@ -146,7 +147,10 @@ function exportPosts(published, markupDir) {
       collection: post.collection_slug || undefined,
       author: post.author_name || undefined,
       excerpt: post.excerpt || undefined,
-      ...post.meta
+      ...post.meta,
+      // After the spread: term URLs are derived from meta, never authored, and
+      // the build is the only thing allowed to decide where a term page lives.
+      terms: postTerms(post)
     }
     const itemFile = itemPath(post)
     const file = path.join(markupDir, itemFile)
@@ -188,11 +192,12 @@ function itemPath(post) {
 // name ("dev-notes") is unreachable in a nunjucks expression; and the sort
 // order lives in the collections row, which poops can't see. The item list
 // travels as front matter, so a theme only reads page.pageItems.
+//
+// Taxonomy term pages are generated here for the same reason: poops puts the
+// term context on that same unreachable collection global, so a theme could
+// never read it. They are just index pages over a filtered item list.
 function exportCollections(published, markupDir) {
   for (const collection of collections.all()) {
-    const dir = path.join(markupDir, collection.slug)
-    mkdirSync(dir, { recursive: true })
-
     const items = published
       .filter((post) => post.collection_id === collection.id)
       .sort(comparePosts(collection))
@@ -202,33 +207,117 @@ function exportCollections(published, markupDir) {
         date: post.published_at || post.created_at,
         excerpt: post.excerpt || autoExcerpt(post.body_markdown),
         author: post.author_name || undefined,
-        featured_image: post.meta.featured_image || undefined
+        featured_image: post.meta.featured_image || undefined,
+        terms: postTerms(post)
       }))
 
-    const perPage = collection.paginate || items.length || 1
-    const totalPages = Math.max(1, Math.ceil(items.length / perPage))
-    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
-      const frontMatter = {
-        layout: collection.index_layout || 'collection',
-        title: collection.name,
-        // Only page 1 carries `collection` — that key is how poops registers a
-        // collection, and a nested page would register a bogus second one.
-        ...(pageNumber === 1 ? { collection: collection.slug } : { collectionSlug: collection.slug }),
-        pageItems: items.slice((pageNumber - 1) * perPage, pageNumber * perPage),
-        pageNumber,
-        totalPages,
-        // Pages 2..N must not show up in the nav tree next to the landing page.
-        ...(pageNumber > 1 ? { nav: false } : {}),
-        prevPageUrl: pageNumber === 2 ? `${collection.slug}/` : (pageNumber > 2 ? `${collection.slug}/${pageNumber - 1}/` : null),
-        nextPageUrl: pageNumber < totalPages ? `${collection.slug}/${pageNumber + 1}/` : null
+    const taxonomies = taxonomyData(collection, items)
+    // The term links reach every page of the collection, but without their
+    // items — front matter is a template's context, not a second database.
+    const links = taxonomies.map((tax) => ({
+      ...tax,
+      terms: tax.terms.map(({ items: _items, ...term }) => term)
+    }))
+
+    writeIndexPages({ markupDir, collection, urlBase: collection.slug, items, isCollectionIndex: true, extra: { taxonomies: links } })
+
+    for (const tax of taxonomies) {
+      for (const term of tax.terms) {
+        writeIndexPages({
+          markupDir,
+          collection,
+          urlBase: `${collection.slug}/${tax.path}/${term.slug}`,
+          items: term.items,
+          title: `${tax.label}: ${term.term}`,
+          extra: { taxonomies: links, taxonomy: tax.path, taxonomyLabel: tax.label, term: term.term, termSlug: term.slug }
+        })
       }
-      const file = pageNumber === 1
-        ? path.join(dir, 'index.html')
-        : path.join(dir, String(pageNumber), 'index.html')
-      mkdirSync(path.dirname(file), { recursive: true })
-      writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n`)
     }
   }
+}
+
+// One paginated listing: the collection index, or one taxonomy term inside it.
+// Page 1 lands at <urlBase>/index.html, page N at <urlBase>/N/index.html.
+function writeIndexPages({ markupDir, collection, urlBase, items, title, extra = {}, isCollectionIndex = false }) {
+  const dir = path.join(markupDir, ...urlBase.split('/'))
+  mkdirSync(dir, { recursive: true })
+
+  const perPage = collection.paginate || items.length || 1
+  const totalPages = Math.max(1, Math.ceil(items.length / perPage))
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+    // Only the collection's own page 1 carries `collection` — that key is how
+    // poops registers a collection, and any other page under the directory
+    // (pagination or a term page) would register a bogus second one.
+    const isLanding = isCollectionIndex && pageNumber === 1
+    const frontMatter = {
+      layout: collection.index_layout || 'collection',
+      title: title || collection.name,
+      ...(isLanding ? { collection: collection.slug } : { collectionSlug: collection.slug }),
+      pageItems: items.slice((pageNumber - 1) * perPage, pageNumber * perPage),
+      pageNumber,
+      totalPages,
+      // Pages 2..N and every term page must stay out of the nav tree, which
+      // lists the collection landing page and nothing below it.
+      ...(isLanding ? {} : { nav: false }),
+      prevPageUrl: pageNumber === 2 ? `${urlBase}/` : (pageNumber > 2 ? `${urlBase}/${pageNumber - 1}/` : null),
+      nextPageUrl: pageNumber < totalPages ? `${urlBase}/${pageNumber + 1}/` : null,
+      ...extra
+    }
+    const file = pageNumber === 1
+      ? path.join(dir, 'index.html')
+      : path.join(dir, String(pageNumber), 'index.html')
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n`)
+  }
+}
+
+// A meta field's terms, tolerating both shapes it can hold: the array the
+// editor and the WXR import write, and a bare string typed as a meta row.
+function termsOf(source, field) {
+  const value = source?.[field]
+  if (value === undefined || value === null) return []
+  return [].concat(value).map((term) => String(term).trim()).filter(Boolean)
+}
+
+// Term links for one post's front matter, so a theme renders them without
+// knowing how a term becomes a URL. Standalone pages sit outside every
+// collection, and a term page only exists inside one.
+function postTerms(post) {
+  if (!post.collection_slug) return undefined
+  const terms = []
+  const seen = new Set()
+  for (const tax of TAXONOMIES) {
+    for (const term of termsOf(post.meta, tax.field)) {
+      const slug = slugify(term)
+      // No slug, no page to link to — and two spellings that slugify the same
+      // would otherwise link the same page twice from one post.
+      if (!slug || seen.has(`${tax.path}/${slug}`)) continue
+      seen.add(`${tax.path}/${slug}`)
+      terms.push({ term, slug, label: tax.label, taxonomy: tax.path, url: `${post.collection_slug}/${tax.path}/${slug}/` })
+    }
+  }
+  return terms.length ? terms : undefined
+}
+
+// Groups a collection's items by every taxonomy field into
+// [{ name, path, label, terms: [{ term, slug, url, count, items }] }].
+// Terms are keyed by slug, so two spellings that share a URL share a page —
+// the first spelling seen is the one displayed.
+function taxonomyData(collection, items) {
+  return TAXONOMIES.map((tax) => {
+    const terms = new Map()
+    for (const item of items) {
+      for (const { term, slug } of (item.terms || []).filter((t) => t.taxonomy === tax.path)) {
+        if (!terms.has(slug)) {
+          terms.set(slug, { term, slug, url: `${collection.slug}/${tax.path}/${slug}/`, count: 0, items: [] })
+        }
+        const entry = terms.get(slug)
+        entry.count++
+        entry.items.push(item)
+      }
+    }
+    return { name: tax.field, path: tax.path, label: tax.label, terms: [...terms.values()] }
+  }).filter((tax) => tax.terms.length)
 }
 
 function comparePosts(collection) {

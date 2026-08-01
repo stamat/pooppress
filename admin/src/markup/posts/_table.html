@@ -4,6 +4,7 @@
       <tr>
         <th class="px-3 py-2">Title</th>
         <th class="px-3 py-2 w-32">Collection</th>
+        <th class="px-3 py-2 w-48">Terms</th>
         <th class="px-3 py-2 w-24">Status</th>
         <th class="px-3 py-2 w-32">Date</th>
         <th class="px-3 py-2 w-28"></th>
@@ -17,6 +18,18 @@
             <div class="text-xs text-slate-400">/{{ post.collection_slug or '' }}{% if post.collection_slug %}/{% endif %}{{ post.slug }}</div>
           </td>
           <td class="px-3 py-2 text-slate-600">{{ post.collection_name or '—' }}</td>
+          <td class="px-3 py-2">
+            {# Each term is a link that filters the list down to it. #}
+            <div class="flex flex-wrap gap-1">
+              {% for entry in post.terms %}
+                <a class="rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-600"
+                   hx-get="/admin/posts?term={{ entry.filter | urlencode }}" hx-target="#posts-table" hx-swap="outerHTML"
+                   href="/admin/posts?term={{ entry.filter | urlencode }}">{{ entry.term }}</a>
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endfor %}
+            </div>
+          </td>
           <td class="px-3 py-2">
             <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
           </td>
@@ -32,24 +45,26 @@
           </td>
         </tr>
       {% else %}
-        <tr><td class="px-3 py-6 text-center text-slate-500" colspan="5">No posts found.</td></tr>
+        <tr><td class="px-3 py-6 text-center text-slate-500" colspan="6">No posts found.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
   {% if pages > 1 %}
+    {# Every active filter rides along, or paging would silently widen the list. #}
+    {% set filters = 'search=' ~ (query.search | urlencode) ~ '&status=' ~ (query.status | urlencode) ~ '&collection_id=' ~ (query.collection_id | urlencode) ~ '&term=' ~ (query.term | urlencode) %}
     <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-xs text-slate-600">
       <span>{{ total }} posts · page {{ page }} of {{ pages }}</span>
       <div class="flex gap-2">
         {% if page > 1 %}
-          <a hx-get="/admin/posts?page={{ page - 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}"
+          <a hx-get="/admin/posts?page={{ page - 1 }}&{{ filters }}"
              hx-target="#posts-table" hx-swap="outerHTML"
-             href="/admin/posts?page={{ page - 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}">Previous</a>
+             href="/admin/posts?page={{ page - 1 }}&{{ filters }}">Previous</a>
         {% endif %}
         {% if page < pages %}
-          <a hx-get="/admin/posts?page={{ page + 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}"
+          <a hx-get="/admin/posts?page={{ page + 1 }}&{{ filters }}"
              hx-target="#posts-table" hx-swap="outerHTML"
-             href="/admin/posts?page={{ page + 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}">Next</a>
+             href="/admin/posts?page={{ page + 1 }}&{{ filters }}">Next</a>
         {% endif %}
       </div>
     </div>

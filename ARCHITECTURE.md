@@ -134,7 +134,7 @@ Looked up by token on every authed request — that's what earns it a table. The
 | excerpt       | text         | nullable, manual or auto-generated                                                                                                                                                                                  |
 | status        | enum         | draft, review, published, archived                                                                                                                                                                                  |
 | published_at  | datetime     | nullable, supports scheduling                                                                                                                                                                                       |
-| meta          | text (JSON)  | arbitrary front matter fields                                                                                                                                                                                       |
+| meta          | text (JSON)  | arbitrary front matter fields. `categories` and `tags` are the two built-in taxonomies — arrays of display names, no table of their own                                                                              |
 | created_at    | datetime     |                                                                                                                                                                                                                     |
 | updated_at    | datetime     |                                                                                                                                                                                                                     |
 
@@ -635,6 +635,11 @@ When a build is triggered:
       - URL comes from the collection's permalink pattern
    c. For each collection:
       - Write {collection}/index.html with paginate/sort front matter
+      - Group its items by each taxonomy field and write one paginated term
+        page per term: {collection}/tag/{slug}/ and {collection}/category/{slug}/.
+        Generated here, not by poops' own taxonomies, for the same reason as
+        pagination: poops puts term context on a collection global keyed by
+        directory name, which a shared theme cannot name.
    d. For standalone pages (collection_id = null):
       - Write {slug}.html or {slug}.md
 

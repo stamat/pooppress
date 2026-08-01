@@ -1,0 +1,10 @@
+{# Term links for one entry. The build writes page.terms / post.terms with the
+   URL already resolved, so nothing here has to know how a term is slugified. #}
+{% set entry = entry or page %}
+{% if entry.terms and entry.terms.length %}
+  <ul class="terms">
+    {% for term in entry.terms %}
+      <li><a class="term" href="{{ relativePathPrefix }}{{ term.url }}" rel="tag">{{ term.term }}</a></li>
+    {% endfor %}
+  </ul>
+{% endif %}

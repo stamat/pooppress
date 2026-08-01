@@ -1,6 +1,11 @@
 {% extends "default.html" %}
 {% block main %}
+{# One template, three jobs: the collection landing page, its pagination, and
+   a taxonomy term page — page.term is set only on the last of those. #}
 <h1 class="collection-title">{{ page.title }}</h1>
+{% if page.term %}
+  <p class="term-back"><a href="{{ relativePathPrefix }}{{ page.collectionSlug }}/">← All posts</a></p>
+{% endif %}
 {# pooppress paginates in the build bridge: page.pageItems is this page's slice. #}
 <div class="post-list">
   {% for post in page.pageItems %}
@@ -10,4 +15,5 @@
   {% endfor %}
 </div>
 {% include "pagination.html" %}
+{% include "taxonomy-list.html" %}
 {% endblock %}

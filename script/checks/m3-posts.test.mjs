@@ -108,6 +108,58 @@ test('the featured_image field merges into meta and clears when emptied', async 
   assert.deepEqual(q.posts.get(id).meta.tags, ['x'])
 })
 
+test('taxonomy fields parse to term arrays and clear when emptied', async () => {
+  const collection = q.collections.bySlug('blog')
+  const created = await app.form('/admin/posts', {
+    title: 'Tagged', slug: 'tagged', collection_id: String(collection.id), body_markdown: '',
+    tags: ' js , Static Site ,js ', categories: 'Notes'
+  })
+  const id = Number(created.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
+  assert.deepEqual(q.posts.get(id).meta.tags, ['js', 'Static Site'], 'trimmed and de-duped')
+  assert.deepEqual(q.posts.get(id).meta.categories, ['Notes'])
+
+  // the editor shows them back comma-separated and offers what is already in
+  // use, so a term doesn't get re-typed three slightly different ways
+  const editor = await app.request(`/admin/posts/${id}`)
+  const html = await editor.text()
+  assert.match(html, /name="tags"[^>]*value="js, Static Site"/)
+  assert.match(html, /<datalist id="tags-known">[\s\S]*Static Site/)
+  assert.ok(q.posts.terms('tags').includes('Static Site'))
+
+  await app.form(`/admin/posts/${id}`, {
+    title: 'Tagged', slug: 'tagged', collection_id: String(collection.id), body_markdown: '',
+    tags: '', categories: 'Notes'
+  })
+  assert.equal(q.posts.get(id).meta.tags, undefined, 'an emptied field removes the key')
+  assert.deepEqual(q.posts.get(id).meta.categories, ['Notes'])
+})
+
+test('the list filters by term and shows each post\'s terms', async () => {
+  const collection = q.collections.bySlug('blog')
+  await app.form('/admin/posts', {
+    title: 'Filterable', slug: 'filterable', collection_id: String(collection.id), body_markdown: '',
+    tags: 'Static Site', categories: 'Notes'
+  })
+  await app.form('/admin/posts', {
+    title: 'Untagged one', slug: 'untagged-one', collection_id: String(collection.id), body_markdown: ''
+  })
+
+  const filtered = await (await app.request('/admin/posts?term=tags%3AStatic+Site')).text()
+  assert.ok(filtered.includes('Filterable'), 'the tagged post should survive its own filter')
+  assert.ok(!filtered.includes('Untagged one'), 'an untagged post leaked through the term filter')
+  // the column renders each term as a link that re-applies the filter
+  assert.match(filtered, /href="\/admin\/posts\?term=tags%3AStatic%20Site"/)
+
+  // a term from the other taxonomy narrows on its own field
+  assert.ok((await (await app.request('/admin/posts?term=categories%3ANotes')).text()).includes('Filterable'))
+  // categories:Static Site matches nothing — the term exists, but not there
+  assert.ok(!(await (await app.request('/admin/posts?term=categories%3AStatic+Site')).text()).includes('Filterable'))
+  // a hand-edited field falls back to no filter rather than erroring
+  assert.ok((await (await app.request('/admin/posts?term=bogus%3Ajs')).text()).includes('Untagged one'))
+
+  assert.equal(q.posts.list({ taxonomy: 'tags', term: 'Static Site' }).total, 1)
+})
+
 test('drafts and autosaves trigger zero builds; publishing triggers one', async () => {
   const collection = q.collections.bySlug('blog')
   const before = builds.requested

@@ -113,8 +113,9 @@ test('importing a WXR brings over posts, pages, authors, taxonomy and media', as
   assert.equal(hello.status, 'published')
   assert.equal(hello.published_at, '2019-07-04 10:11:12')
   assert.equal(hello.excerpt, 'Old summary')
-  assert.deepEqual(hello.meta.categories, ['notes'])
-  assert.deepEqual(hello.meta.tags, ['legacy'])
+  // display names, not nicenames — the build slugifies them back for the URL
+  assert.deepEqual(hello.meta.categories, ['Notes'])
+  assert.deepEqual(hello.meta.tags, ['Legacy'])
 
   const draft = q.posts.list({ search: 'Unfinished' }).rows[0]
   assert.equal(draft.status, 'draft')

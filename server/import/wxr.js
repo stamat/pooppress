@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser'
 import { users, posts, collections, media, settings } from '../queries.js'
 import { hashPassword } from '../auth.js'
 import { storeUpload } from '../media.js'
-import { SLUG_RE } from '../validate.js'
+import { SLUG_RE, slugify } from '../validate.js'
 
 // WordPress statuses → ours. Anything unknown lands as a draft: an import
 // should never publish something the old site didn't.
@@ -160,7 +160,9 @@ function rewriteUrls(body, attachments, oldBase) {
 function taxonomy(item, domain) {
   return list(item.category)
     .filter((entry) => typeof entry === 'object' && entry['@_domain'] === domain)
-    .map((entry) => entry['@_nicename'] || text(entry))
+    // Display name first — the build slugifies it back into the URL, and
+    // "Web Development" reads better on a term page than "web-development".
+    .map((entry) => text(entry) || entry['@_nicename'])
     .filter(Boolean)
 }
 
@@ -179,11 +181,6 @@ function permalinkPath(link, oldBase) {
 }
 
 function safeSlug(raw, id) {
-  const slug = String(raw)
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 200)
+  const slug = slugify(raw)
   return SLUG_RE.test(slug) ? slug : `post-${id || randomBytes(4).toString('hex')}`
 }

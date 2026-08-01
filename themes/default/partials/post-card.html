@@ -10,5 +10,6 @@
     {% if theme.showAuthor and post.author %} · <span class="author">{{ post.author }}</span>{% endif %}
   </p>
   {% if post.excerpt %}<p class="post-excerpt">{{ post.excerpt }}</p>{% endif %}
+  {% set entry = post %}{% include "terms.html" %}
   <a class="read-more" href="{{ relativePathPrefix }}{{ post.url }}">Read more →</a>
 </article>

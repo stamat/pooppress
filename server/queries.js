@@ -99,10 +99,17 @@ export const posts = {
 
   // Admin listing: filters + LIKE search, at most a few thousand rows.
   // Ceiling: swap LIKE for FTS5 when it gets slow, not before.
-  list ({ status, collection_id, author_id, search, page = 1, limit = 20 } = {}) {
+  list ({ status, collection_id, author_id, search, taxonomy, term, page = 1, limit = 20 } = {}) {
     const where = []
     const params = []
     if (status) { where.push('p.status = ?'); params.push(status) }
+    // Taxonomy terms live in the meta JSON, so the filter is a json_each scan.
+    // `taxonomy` is checked against TAXONOMIES by the caller — it builds the
+    // JSON path, and an arbitrary one would be a malformed-path error.
+    if (taxonomy && term) {
+      where.push('EXISTS (SELECT 1 FROM json_each(p.meta, ?) WHERE json_each.value = ?)')
+      params.push(`$."${taxonomy}"`, term)
+    }
     // 'none' means standalone pages — the rows a collection filter can never reach.
     if (collection_id === 'none') where.push('p.collection_id IS NULL')
     else if (collection_id !== undefined && collection_id !== null && collection_id !== '') {
@@ -127,6 +134,15 @@ export const posts = {
       LIMIT ? OFFSET ?`).all(...params, limit, offset).map(parsePost)
     return { rows, total, page: Math.max(1, Number(page)), pages: Math.max(1, Math.ceil(total / limit)) }
   },
+
+  // Every term already used in one taxonomy field — the editor's autocomplete,
+  // so a second post gets "JavaScript" and not a near-miss "Javascript".
+  // json_each yields one row per array element, and the scalar itself when the
+  // field was saved as a bare string.
+  terms: (field) => sql(`
+    SELECT DISTINCT json_each.value AS term FROM posts, json_each(posts.meta, ?)
+    WHERE json_type(posts.meta, ?) IS NOT NULL ORDER BY term`)
+    .all(`$."${field}"`, `$."${field}"`).map((row) => String(row.term)),
 
   recent: (limit = 5) => sql('SELECT * FROM posts ORDER BY updated_at DESC LIMIT ?').all(limit).map(parsePost),
   countByStatus: () => sql('SELECT status, COUNT(*) AS n FROM posts GROUP BY status').all(),

@@ -28,7 +28,10 @@ before(async () => {
       collection_id: blog.id, slug, title,
       body_markdown: `# ${title}\n\nBody of ${title} with a [link](https://example.com).`,
       excerpt: `Excerpt of ${title}`,
-      status: 'published', published_at: date
+      status: 'published', published_at: date,
+      // "Static Site" exercises slugified multi-word terms; only two of the
+      // three posts carry it, so the term page must not be the whole index.
+      meta: slug === 'first' ? { tags: ['js'] } : { tags: ['js', 'Static Site'], categories: ['Notes'] }
     })
   }
   q.posts.create({ collection_id: null, slug: 'about', title: 'About', body_markdown: 'About page.', status: 'published', published_at: '2024-01-01 09:00:00' })
@@ -58,6 +61,35 @@ test('a post page is readable: title, body, date, navigation', () => {
   assert.match(post, /Fresh Install/, 'site title (header) missing')
   assert.match(post, /<footer/, 'footer missing')
   assert.match(post, /<time/, 'post date missing')
+})
+
+test('every term gets a paginated page listing only its posts', () => {
+  // three posts tagged js, page size 2 — so the term page paginates too
+  const js = read('blog', 'tag', 'js', 'index.html')
+  assert.match(js, /Tag: js/)
+  assert.match(js, /Third post/)
+  assert.ok(!js.includes('First post'), 'term page 1 should hold only the newest two')
+  assert.match(read('blog', 'tag', 'js', '2', 'index.html'), /First post/)
+
+  // multi-word term slugified into the URL, and scoped to its two posts
+  const staticSite = read('blog', 'tag', 'static-site', 'index.html')
+  assert.match(staticSite, /Tag: Static Site/)
+  assert.ok(!staticSite.includes('First post'), 'untagged post leaked onto a term page')
+
+  assert.match(read('blog', 'category', 'notes', 'index.html'), /Category: Notes/)
+})
+
+test('posts and the collection index link their terms', () => {
+  assert.match(read('blog', 'third.html'), /href="\.\.\/blog\/tag\/static-site\/"/)
+  const index = read('blog', 'index.html')
+  assert.match(index, /href="\.\.\/blog\/tag\/js\/"/)
+  assert.match(index, /Notes/)
+})
+
+test('term pages stay out of the nav tree', () => {
+  const nav = JSON.parse(read('nav.json'))
+  const urls = JSON.stringify(nav)
+  assert.ok(!urls.includes('/tag/'), `term pages leaked into the nav: ${urls}`)
 })
 
 test('SEO meta and canonical are emitted', () => {

@@ -120,6 +120,47 @@ h1 { font-size: 2rem; margin: 0 0 0.5rem; }
   .page-count { color: $muted; }
 }
 
+.terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+  font-family: $font-ui;
+  font-size: 0.85rem;
+}
+
+.term {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid $rule;
+  border-radius: 999px;
+  color: $muted;
+  text-decoration: none;
+
+  &:hover { border-color: $accent; color: $accent; }
+  &.is-active { border-color: $accent; color: $accent; }
+}
+
+.term-count { opacity: 0.6; }
+
+.term-back {
+  margin: -0.5rem 0 1.5rem;
+  font-family: $font-ui;
+  font-size: 0.9rem;
+}
+
+.taxonomies {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid $rule;
+
+  h2 { margin: 0 0 0.5rem; font-family: $font-ui; font-size: 0.9rem; color: $muted; font-weight: 600; }
+  .taxonomy + .taxonomy { margin-top: 1.25rem; }
+  .terms { margin: 0; }
+}
+
 .site-footer {
   border-top: 1px solid $rule;
   padding: 1.5rem 0 2.5rem;
