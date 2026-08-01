@@ -1,4 +1,9 @@
 <article class="post-card">
+  {% if post.featured_image %}
+    <a href="{{ relativePathPrefix }}{{ post.url }}" tabindex="-1" aria-hidden="true">
+      <img class="featured-img" src="{{ relativePathPrefix }}{{ post.featured_image | replace('/uploads/', 'uploads/') }}" alt="" loading="lazy">
+    </a>
+  {% endif %}
   <h2><a href="{{ relativePathPrefix }}{{ post.url }}">{{ post.title }}</a></h2>
   <p class="post-meta">
     {% if post.date %}<time datetime="{{ post.date }}">{{ post.date | date }}</time>{% endif %}

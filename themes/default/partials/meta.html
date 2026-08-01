@@ -6,6 +6,13 @@
 <meta property="og:type" content="{% if page.collection %}article{% else %}website{% endif %}">
 <meta property="og:title" content="{{ page.title or site.title }}">
 <meta property="og:description" content="{{ summary }}">
+{# og:image must be absolute, so it needs site.url — same rule as og:url. #}
+{% set ogImage = page.image or page.featured_image %}
+{% if ogImage and '://' in ogImage %}
+  <meta property="og:image" content="{{ ogImage }}">
+{% elif ogImage and site.url %}
+  <meta property="og:image" content="{{ site.url }}/{{ ogImage | replace('/uploads/', 'uploads/') }}">
+{% endif %}
 {% if site.url and page.url %}
   <meta property="og:url" content="{{ site.url }}/{{ page.url }}">
   <link rel="canonical" href="{{ site.url }}/{{ page.url }}">

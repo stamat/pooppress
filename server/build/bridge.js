@@ -203,7 +203,8 @@ function exportCollections(published, markupDir) {
         url: itemPath(post).replace(/\.md$/, '.html').split(path.sep).join('/'),
         date: post.published_at || post.created_at,
         excerpt: post.excerpt || autoExcerpt(post.body_markdown),
-        author: post.author_name || undefined
+        author: post.author_name || undefined,
+        featured_image: post.meta.featured_image || undefined
       }))
 
     const perPage = collection.paginate || items.length || 1

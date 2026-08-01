@@ -66,6 +66,17 @@ h1 { font-size: 2rem; margin: 0 0 0.5rem; }
   font-size: 0.875rem;
 }
 
+.featured-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.post-header .featured-img { margin-bottom: 1.5rem; }
+.post-card .featured-img { margin-bottom: 0.75rem; }
+
 .post-body {
   img { max-width: 100%; height: auto; }
 

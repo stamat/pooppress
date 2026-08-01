@@ -5,7 +5,6 @@
          &quot; is what keeps a title with a quote inside this attribute
          instead of breaking out of it. #}
       x-data="postEditor({ title: {{ post.title | dump }}, slug: {{ post.slug | dump }}, featured: {{ (post.meta.featured_image or post.featured_image or '') | dump }} })"
-      @open-media.window="$refs.media.dispatchEvent(new CustomEvent('show'))"
       @media-picked.window="mediaPicked($event.detail.path, $event.detail.alt)">
 
   {% if error %}<div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800">{{ error }}</div>{% endif %}
