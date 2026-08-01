@@ -1,0 +1,17 @@
+# This project sits inside the Apache DocumentRoot, and Apache runs as the same
+# user that owns it — so file permissions grant no protection: data/.env, the
+# SQLite database and all server source are otherwise downloadable over http.
+# Deny the tree, re-open only the built site.
+#
+# It lives here rather than in output/ because every build renames a fresh
+# directory over output/, which would wipe an .htaccess inside it.
+Require all denied
+
+<If "%{REQUEST_URI} =~ m#^/pooppress/output(/|$)#">
+    Require all granted
+    DirectoryIndex index.html
+    # MultiViews maps /slug to slug.html, so extensionless URLs resolve.
+    # ponytail: listing stands in for a missing home page — drop +Indexes once
+    # the site has a page with slug "index".
+    Options +Indexes +MultiViews
+</If>
