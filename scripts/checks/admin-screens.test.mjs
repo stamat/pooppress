@@ -25,7 +25,7 @@ after(async () => {
 })
 
 test('every sidebar destination renders', async () => {
-  for (const url of ['/admin', '/admin/posts', '/admin/media', '/admin/collections', '/admin/themes', '/admin/users', '/admin/settings']) {
+  for (const url of ['/admin', '/admin/posts', '/admin/media', '/admin/collections', '/admin/menu', '/admin/themes', '/admin/users', '/admin/settings']) {
     const res = await app.request(url)
     assert.equal(res.status, 200, `${url} returned ${res.status}`)
   }
@@ -37,6 +37,20 @@ test('saving settings rebuilds the site', async () => {
   assert.equal(res.status, 302)
   assert.equal(q.settings.get('site.title'), 'Renamed')
   assert.equal(builds.requested, before + 1, 'settings shape the output, so they build')
+})
+
+test('the menu saves ordered items, drops blanks, and rebuilds', async () => {
+  const before = builds.requested
+  const res = await app.form('/admin/menu', {
+    label: ['Blog', 'Elsewhere', ''],
+    url: ['/blog', 'https://example.com/x', '']
+  })
+  assert.equal(res.status, 302)
+  assert.deepEqual(q.settings.get('menu'), [
+    { label: 'Blog', url: 'blog' }, // internal urls lose the leading slash
+    { label: 'Elsewhere', url: 'https://example.com/x' }
+  ])
+  assert.equal(builds.requested, before + 1, 'the menu is on every page, so it builds')
 })
 
 test('collections CRUD works and refuses to delete a collection with posts', async () => {

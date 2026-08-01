@@ -54,6 +54,28 @@ export function settingsRoutes() {
     res.redirect('/admin/settings')
   })
 
+  router.get('/admin/menu', adminOnly, (req, res) => res.render('menu/index.html', {
+    page: { title: 'Menu', nav: 'menu' },
+    items: settings.get('menu') || []
+  }))
+
+  router.post('/admin/menu', adminOnly, (req, res) => {
+    const labels = [].concat(req.body.label ?? [])
+    const urls = [].concat(req.body.url ?? [])
+    // Internal URLs are stored site-relative (no leading slash) so the theme
+    // can prefix relativePathPrefix; anything with a scheme passes through.
+    const items = labels.map((label, i) => {
+      const url = String(urls[i] ?? '').trim()
+      return {
+        label: String(label).trim(),
+        url: /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : url.replace(/^\/+/, '')
+      }
+    }).filter((item) => item.label && item.url)
+    settings.set('menu', items)
+    requestBuild('menu changed') // the header menu is on every page
+    res.redirect('/admin/menu')
+  })
+
   router.get('/admin/themes', adminOnly, (req, res) => res.render('themes/list.html', {
     page: { title: 'Themes', nav: 'themes' },
     themes: installedThemes(),

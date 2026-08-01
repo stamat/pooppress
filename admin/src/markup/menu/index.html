@@ -1,0 +1,23 @@
+{% extends "admin.html" %}
+{% block content %}
+<h1 class="mb-4">Menu</h1>
+<form method="post" action="/admin/menu" class="max-w-2xl">
+  <div class="card p-4" x-data="menuRows({{ items | dump }})">
+    <div class="mb-2 flex items-center justify-between">
+      <h2>Site navigation</h2>
+      <button class="btn" type="button" @click="add()">Add item</button>
+    </div>
+    <p class="mb-3 text-xs text-slate-500">Rendered by the theme in this order. Leave the list empty to fall back to the automatic page tree. URLs are site-relative (<code>blog</code>) or external (<code>https://…</code>).</p>
+    <template x-for="(row, i) in rows" :key="i">
+      <div class="mb-2 flex gap-2">
+        <input class="input w-48" name="label" placeholder="label" x-model="row.label">
+        <input class="input flex-1" name="url" placeholder="url" x-model="row.url">
+        <button class="btn" type="button" @click="move(i, -1)" :disabled="i == 0" aria-label="Move up">↑</button>
+        <button class="btn" type="button" @click="move(i, 1)" :disabled="i == rows.length - 1" aria-label="Move down">↓</button>
+        <button class="btn btn-danger" type="button" @click="remove(i)" aria-label="Remove">×</button>
+      </div>
+    </template>
+  </div>
+  <div class="mt-4"><button class="btn btn-primary" type="submit">Save menu</button></div>
+</form>
+{% endblock %}

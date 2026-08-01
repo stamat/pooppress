@@ -2,5 +2,16 @@
   <div class="wrap">
     <a class="site-title" href="{{ relativePathPrefix }}">{{ site.title }}</a>
     {% if site.description %}<p class="site-description">{{ site.description }}</p>{% endif %}
+    {% if menu and menu.length %}
+    {# Admin-curated menu; internal urls are stored site-relative, scheme = external #}
+    <nav class="site-nav">
+      {% for item in menu %}<a href="{% if ':' in item.url %}{{ item.url }}{% else %}{{ relativePathPrefix }}{{ item.url }}{% endif %}">{{ item.label }}</a>{% endfor %}
+    </nav>
+    {% elif nav and nav.length %}
+    <nav class="site-nav">
+      {# url != null: synthesized section nodes carry no url #}
+      {% for item in nav %}{% if item.url != null %}<a href="{{ relativePathPrefix }}{{ item.url }}">{{ item.title }}</a>{% endif %}{% endfor %}
+    </nav>
+    {% endif %}
   </div>
 </header>

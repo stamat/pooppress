@@ -37,6 +37,21 @@ a:hover { text-decoration: none; }
     color: $muted;
     font-size: 0.95rem;
   }
+
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+
+    a {
+      color: $muted;
+      text-decoration: none;
+    }
+
+    a:hover { color: $ink; }
+  }
 }
 
 main.wrap { padding-top: 2rem; padding-bottom: 3rem; }

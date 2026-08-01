@@ -73,6 +73,7 @@ function exportInto({ buildDir, markupDir, outDir, site, theme, items }) {
   exportPosts(items, markupDir)
   exportCollections(items, markupDir)
   exportThemeConfig(theme, markupDir)
+  exportMenu(markupDir)
   writeFileSync(path.join(buildDir, 'poops.json'), JSON.stringify(poopsConfig({ site, theme, buildDir, outDir }), null, 2))
 }
 
@@ -112,6 +113,14 @@ function exportThemeConfig({ manifest }, markupDir) {
   const dir = path.join(markupDir, '_data')
   mkdirSync(dir, { recursive: true })
   writeFileSync(path.join(dir, 'theme.yaml'), yaml.dump(config))
+}
+
+// The admin-curated menu reaches templates as {{ menu }} — always written, []
+// when unset, so a theme can fall back to the automatic nav tree.
+function exportMenu(markupDir) {
+  const dir = path.join(markupDir, '_data')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(path.join(dir, 'menu.yaml'), yaml.dump(settings.get('menu') || []))
 }
 
 function exportPosts(published, markupDir) {
@@ -193,6 +202,8 @@ function exportCollections(published, markupDir) {
         pageItems: items.slice((pageNumber - 1) * perPage, pageNumber * perPage),
         pageNumber,
         totalPages,
+        // Pages 2..N must not show up in the nav tree next to the landing page.
+        ...(pageNumber > 1 ? { nav: false } : {}),
         prevPageUrl: pageNumber === 2 ? `${collection.slug}/` : (pageNumber > 2 ? `${collection.slug}/${pageNumber - 1}/` : null),
         nextPageUrl: pageNumber < totalPages ? `${collection.slug}/${pageNumber + 1}/` : null
       }
@@ -234,10 +245,14 @@ function poopsConfig({ site, theme, buildDir, outDir }) {
       out: outDir,
       options: {
         site,
-        data: ['_data/theme.yaml'],
+        data: ['_data/theme.yaml', '_data/menu.yaml'],
         includePaths: ['_layouts', '_partials'],
         sitemap: 'sitemap.xml',
-        feed: true // RSS per collection — core dogfooding the engine's own generators
+        feed: true, // RSS per collection — core dogfooding the engine's own generators
+        // Header menu: top-level pages + one leaf per collection landing.
+        // home:false — the site title already links home. Also writes nav.json
+        // into the output for client-side consumers.
+        nav: { out: 'nav.json', collections: 'index', home: false }
       }
     },
     copy: [],

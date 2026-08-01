@@ -75,6 +75,18 @@ Alpine.data('postEditor', (initial = {}) => ({
   }
 }))
 
+// Label/url rows for the site menu — row order is menu order.
+Alpine.data('menuRows', (initial = []) => ({
+  rows: (initial || []).map((item) => ({ label: item.label || '', url: item.url || '' })),
+  add () { this.rows.push({ label: '', url: '' }) },
+  remove (i) { this.rows.splice(i, 1) },
+  move (i, delta) {
+    const j = i + delta
+    if (j < 0 || j >= this.rows.length) return
+    ;[this.rows[i], this.rows[j]] = [this.rows[j], this.rows[i]]
+  }
+}))
+
 // Key/value rows for the post's meta JSON column.
 Alpine.data('metaRows', (initial = {}) => ({
   rows: Object.entries(initial || {}).map(([key, value]) => ({
