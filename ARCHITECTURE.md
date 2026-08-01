@@ -123,54 +123,54 @@ Looked up by token on every authed request — that's what earns it a table. The
 
 ### posts
 
-| Column        | Type         | Notes                              |
-| ------------- | ------------ | ---------------------------------- |
-| id            | int, PK, AI  |                                    |
-| collection_id | int, FK      | nullable (standalone pages)        |
-| author_id     | int, FK      | references users                   |
+| Column        | Type         | Notes                                                                                                                                                                                                               |
+| ------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id            | int, PK, AI  |                                                                                                                                                                                                                     |
+| collection_id | int, FK      | nullable (standalone pages)                                                                                                                                                                                         |
+| author_id     | int, FK      | references users                                                                                                                                                                                                    |
 | slug          | varchar(255) | `^[a-z0-9][a-z0-9-]*$` — becomes a file path at build. Unique via `COALESCE(collection_id, 0), slug` index (plain UNIQUE treats NULL collections as distinct — two `about` pages would silently overwrite at build) |
-| title         | varchar(255) |                                    |
-| body_markdown | longtext     | canonical content                  |
-| excerpt       | text         | nullable, manual or auto-generated |
-| status        | enum         | draft, review, published, archived |
-| published_at  | datetime     | nullable, supports scheduling      |
-| meta          | text (JSON)  | arbitrary front matter fields      |
-| created_at    | datetime     |                                    |
-| updated_at    | datetime     |                                    |
+| title         | varchar(255) |                                                                                                                                                                                                                     |
+| body_markdown | longtext     | canonical content                                                                                                                                                                                                   |
+| excerpt       | text         | nullable, manual or auto-generated                                                                                                                                                                                  |
+| status        | enum         | draft, review, published, archived                                                                                                                                                                                  |
+| published_at  | datetime     | nullable, supports scheduling                                                                                                                                                                                       |
+| meta          | text (JSON)  | arbitrary front matter fields                                                                                                                                                                                       |
+| created_at    | datetime     |                                                                                                                                                                                                                     |
+| updated_at    | datetime     |                                                                                                                                                                                                                     |
 
 `meta` replaces YAML front matter. Any field the author adds in the editor (featured_image, custom_css, whatever) is a key in the JSON object. During build, it's merged with the core post fields into the front matter. SQLite's `json_extract()` covers the rare query into it — no EAV table, no join.
 
 ### collections
 
-| Column       | Type         | Notes                          |
-| ------------ | ------------ | ------------------------------ |
-| id           | int, PK, AI  |                                |
-| name         | varchar(255) | display name                   |
-| slug         | varchar(255) | unique, used as directory name |
-| sort_by      | varchar(100) | default: 'published_at'        |
-| sort_order   | enum         | asc, desc. Default: desc       |
-| paginate     | int          | nullable, items per page       |
+| Column       | Type         | Notes                                                                                                      |
+| ------------ | ------------ | ---------------------------------------------------------------------------------------------------------- |
+| id           | int, PK, AI  |                                                                                                            |
+| name         | varchar(255) | display name                                                                                               |
+| slug         | varchar(255) | unique, used as directory name                                                                             |
+| sort_by      | varchar(100) | default: 'published_at'                                                                                    |
+| sort_order   | enum         | asc, desc. Default: desc                                                                                   |
+| paginate     | int          | nullable, items per page                                                                                   |
 | permalink    | varchar(255) | nullable pattern, e.g. `/:year/:month/:slug`; null = `/{collection}/{slug}`. WP migrations keep their URLs |
-| layout       | varchar(255) | layout template for items      |
-| index_layout | varchar(255) | layout for collection index    |
-| created_at   | datetime     |                                |
-| updated_at   | datetime     |                                |
+| layout       | varchar(255) | layout template for items                                                                                  |
+| index_layout | varchar(255) | layout for collection index                                                                                |
+| created_at   | datetime     |                                                                                                            |
+| updated_at   | datetime     |                                                                                                            |
 
 ### media
 
-| Column        | Type         | Notes                 |
-| ------------- | ------------ | --------------------- |
-| id            | int, PK, AI  |                       |
-| uploaded_by   | int, FK      | references users      |
-| original_name | varchar(255) | display only — never a path |
+| Column        | Type         | Notes                             |
+| ------------- | ------------ | --------------------------------- |
+| id            | int, PK, AI  |                                   |
+| uploaded_by   | int, FK      | references users                  |
+| original_name | varchar(255) | display only — never a path       |
 | path          | varchar(512) | generated: `uploads/<uuid>.<ext>` |
-| mime_type     | varchar(100) |                       |
-| size_bytes    | int          |                       |
-| width         | int          | nullable (non-images) |
-| height        | int          | nullable              |
-| alt_text      | text         | default alt text      |
-| variants      | text (JSON)  | `[{path, width, format}, ...]` |
-| created_at    | datetime     |                       |
+| mime_type     | varchar(100) |                                   |
+| size_bytes    | int          |                                   |
+| width         | int          | nullable (non-images)             |
+| height        | int          | nullable                          |
+| alt_text      | text         | default alt text                  |
+| variants      | text (JSON)  | `[{path, width, format}, ...]`    |
+| created_at    | datetime     |                                   |
 
 `variants` is written by poops-images after upload and read by the build step to generate srcset markup. It's derived data with one producer and one consumer — a JSON column, not a table.
 
@@ -340,7 +340,7 @@ A plugin is a directory with a `plugin.json` manifest:
       "codeBlock": "extensions.js"
     },
     "styles": "styles/prism.css",
-    "scripts": "scripts/prism.js"
+    "scripts": "script/prism.js"
   },
   "configSchema": {
     "theme": {
@@ -401,23 +401,23 @@ Beyond template filters/extensions, a plugin can declare `"hooks": "hooks.js"` i
 ```js
 // plugins/reading-time/hooks.js
 export default function register({ hooks, config }) {
-  hooks.filter('post:frontmatter', (fm, post) => {
-    fm.readingTime = Math.ceil(post.body_markdown.split(/\s+/).length / 200)
-    return fm
-  })
+  hooks.filter("post:frontmatter", (fm, post) => {
+    fm.readingTime = Math.ceil(post.body_markdown.split(/\s+/).length / 200);
+    return fm;
+  });
 }
 ```
 
 Hook points (deliberately few):
 
-| Hook | Kind | Fires |
-| --- | --- | --- |
-| `post:save` | event | after any post save commits |
-| `post:publish` / `post:unpublish` | event | on status transition |
-| `media:upload` | event | after upload + variants written |
-| `post:frontmatter` | filter (waterfall) | per post during export — shape front matter |
-| `build:before` | event | after DB export, before `poops.compile()` — add/edit files in tmp |
-| `build:after` | event | after compile — post-process `output/` |
+| Hook                              | Kind               | Fires                                                             |
+| --------------------------------- | ------------------ | ----------------------------------------------------------------- |
+| `post:save`                       | event              | after any post save commits                                       |
+| `post:publish` / `post:unpublish` | event              | on status transition                                              |
+| `media:upload`                    | event              | after upload + variants written                                   |
+| `post:frontmatter`                | filter (waterfall) | per post during export — shape front matter                       |
+| `build:before`                    | event              | after DB export, before `poops.compile()` — add/edit files in tmp |
+| `build:after`                     | event              | after compile — post-process `output/`                            |
 
 Since every save triggers a render, content events + build events cover the whole lifecycle — this is what enables WP-style plugins beyond templating: CDN purge, webhook pings, newsletter-on-publish, cross-posting, auto alt-text on upload.
 
@@ -765,18 +765,18 @@ Ceilings: shared-host memory limits can choke builds on large sites (sass + shar
 
 ## Tech stack decisions
 
-| Concern          | Choice                          | Rationale                                                        |
-| ---------------- | ------------------------------- | ---------------------------------------------------------------- |
-| Runtime          | Node.js                         | poops is a Node library — build is an in-process `compile()` call. Any other runtime (PHP, etc.) would have to shell out to Node: two runtimes for nothing |
-| Server framework | Express                         | Boring, documented everywhere                                    |
-| Database         | SQLite (better-sqlite3)         | Zero config, zero server process, sync API, backup = copy a file |
-| ORM              | None — plain SQL                | 5 tables. Migrations = numbered .sql files + `PRAGMA user_version` |
+| Concern          | Choice                                                                               | Rationale                                                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime          | Node.js                                                                              | poops is a Node library — build is an in-process `compile()` call. Any other runtime (PHP, etc.) would have to shell out to Node: two runtimes for nothing                                               |
+| Server framework | Express                                                                              | Boring, documented everywhere                                                                                                                                                                            |
+| Database         | SQLite (better-sqlite3)                                                              | Zero config, zero server process, sync API, backup = copy a file                                                                                                                                         |
+| ORM              | None — plain SQL                                                                     | 5 tables. Migrations = numbered .sql files + `PRAGMA user_version`                                                                                                                                       |
 | Admin UI         | HAT stack ([stamat/shitstorm-hat](https://github.com/stamat/shitstorm-hat) template) | Server-rendered nunjucks + htmx partial swaps + Alpine.js sprinkles + Tailwind. Built with poops itself — admin and site share one engine. Styles stay minimal: Tailwind utilities, no component library |
-| Markdown editor  | EasyMDE                         | Interactive: toolbar, shortcuts, side-by-side preview — one script include, zero build. Ceiling: CodeMirror 5 core; swap to CM6 setup if it rots |
-| Auth             | Sessions (SQLite table) + scrypt (node:crypto) | Stdlib hashing, no bcrypt dep; DB-backed sessions survive restarts, span Passenger workers, and make logout real revocation |
-| Build engine     | poops                           | Already exists, already works                                    |
-| Image processing | poops-images                    | Already exists, generates width variants                         |
-| CSS              | Whatever the theme uses         | poops handles SCSS/CSS compilation                               |
+| Markdown editor  | EasyMDE                                                                              | Interactive: toolbar, shortcuts, side-by-side preview — one script include, zero build. Ceiling: CodeMirror 5 core; swap to CM6 setup if it rots                                                         |
+| Auth             | Sessions (SQLite table) + scrypt (node:crypto)                                       | Stdlib hashing, no bcrypt dep; DB-backed sessions survive restarts, span Passenger workers, and make logout real revocation                                                                              |
+| Build engine     | poops                                                                                | Already exists, already works                                                                                                                                                                            |
+| Image processing | poops-images                                                                         | Already exists, generates width variants                                                                                                                                                                 |
+| CSS              | Whatever the theme uses                                                              | poops handles SCSS/CSS compilation                                                                                                                                                                       |
 
 ---
 

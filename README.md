@@ -16,15 +16,15 @@ Design: [PHILOSOPHY.md](PHILOSOPHY.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · 
 
 ## What's here
 
-| Path | What |
-| --- | --- |
-| `bin/pooppress.js` | CLI: `init`, `start`, `build`, `deploy`, `import` |
-| `server/` | Express app, SQLite, auth, routes, build bridge, WXR importer |
-| `admin/` | admin panel — server-rendered nunjucks + htmx + Alpine + Tailwind |
-| `themes/default/` | the bundled theme |
-| `docs/` | this project's documentation site (poops + poops-docs-theme) |
-| `scripts/checks/` | one runnable check per milestone |
-| `scripts/install.sh`, `scripts/Dockerfile` | VPS and container packaging |
+| Path                                     | What                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `bin/pooppress.js`                       | CLI: `init`, `start`, `build`, `deploy`, `import`                 |
+| `server/`                                | Express app, SQLite, auth, routes, build bridge, WXR importer     |
+| `admin/`                                 | admin panel — server-rendered nunjucks + htmx + Alpine + Tailwind |
+| `themes/default/`                        | the bundled theme                                                 |
+| `docs/`                                  | this project's documentation site (poops + poops-docs-theme)      |
+| `script/checks/`                         | one runnable check per milestone                                  |
+| `script/install.sh`, `script/Dockerfile` | VPS and container packaging                                       |
 
 ## Development
 

@@ -1,6 +1,6 @@
 # pooppress in a container: one process, one volume.
 #
-#   docker build -t pooppress -f scripts/Dockerfile .
+#   docker build -t pooppress -f script/Dockerfile .
 #   docker run -it -v $PWD/data:/app/data pooppress pooppress init
 #   docker run -d -p 3000:3000 -v $PWD/data:/app/data -v $PWD/output:/app/output pooppress
 FROM node:22-slim

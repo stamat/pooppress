@@ -18,8 +18,8 @@
     "admin/dist",
     "admin/src/markup",
     "app.js",
-    "scripts/install.sh",
-    "scripts/Dockerfile"
+    "script/install.sh",
+    "script/Dockerfile"
   ],
   "scripts": {
     "dev": "node bin/pooppress.js start",
@@ -28,7 +28,7 @@
     "build": "node bin/pooppress.js build",
     "start": "node bin/pooppress.js start",
     "admin:build": "cd admin && npx poops --build -q",
-    "check": "node --test 'scripts/checks/*.test.mjs'",
+    "check": "node --test 'script/checks/*.test.mjs'",
     "docs:build": "npx poops --build -q -c docs/poops.json",
     "docs:dev": "npx poops -c docs/poops.json"
   },

@@ -6,17 +6,17 @@ Companion to [ARCHITECTURE.md](ARCHITECTURE.md). That file says what; this file 
 
 ## Locked decisions
 
-| Concern | Decision |
-| --- | --- |
-| Runtime | Node.js ≥ 20, single process |
-| Server | Express |
-| Database | SQLite via better-sqlite3, plain SQL, numbered `.sql` migrations |
-| Admin UI | HAT stack from [stamat/shitstorm-hat](https://github.com/stamat/shitstorm-hat): server-rendered nunjucks + htmx partial swaps + Alpine.js sprinkles + Tailwind v4 |
-| Admin styles | Minimal. Tailwind utilities only, no component library, no custom design system |
-| Markdown editor | EasyMDE — interactive (toolbar, shortcuts, side-by-side preview), one include |
-| Auth | Sessions in SQLite `sessions` table (hashed tokens, 14-day sliding) + scrypt from node:crypto; cookies `HttpOnly; SameSite=Lax; Secure` |
-| Build engine | poops + poops-images |
-| Hosting targets | All first-class, none required: laptop mode, Docker container, VPS install script (systemd + Caddy), shared hosting via Passenger/cPanel |
+| Concern         | Decision                                                                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime         | Node.js ≥ 20, single process                                                                                                                                      |
+| Server          | Express                                                                                                                                                           |
+| Database        | SQLite via better-sqlite3, plain SQL, numbered `.sql` migrations                                                                                                  |
+| Admin UI        | HAT stack from [stamat/shitstorm-hat](https://github.com/stamat/shitstorm-hat): server-rendered nunjucks + htmx partial swaps + Alpine.js sprinkles + Tailwind v4 |
+| Admin styles    | Minimal. Tailwind utilities only, no component library, no custom design system                                                                                   |
+| Markdown editor | EasyMDE — interactive (toolbar, shortcuts, side-by-side preview), one include                                                                                     |
+| Auth            | Sessions in SQLite `sessions` table (hashed tokens, 14-day sliding) + scrypt from node:crypto; cookies `HttpOnly; SameSite=Lax; Secure`                           |
+| Build engine    | poops + poops-images                                                                                                                                              |
+| Hosting targets | All first-class, none required: laptop mode, Docker container, VPS install script (systemd + Caddy), shared hosting via Passenger/cPanel                          |
 
 Full dependency list (server): `express`, `better-sqlite3`, `nunjucks`, `js-yaml`, `poops`, `poops-images`, `multer` (upload parsing). `fast-xml-parser` joins at M9, importer-only. Security adds zero dependencies — all stdlib (see ARCHITECTURE.md §Security model). Admin vendors `htmx`, `alpinejs`, `easymde` as static files; `tailwindcss` is a dev dependency compiled once at admin build time — sites never pay for it.
 
@@ -43,10 +43,10 @@ pooppress/
 ├── admin/                     # shitstorm-hat derived poops project
 │   ├── src/markup/            # nunjucks pages + htmx partials
 │   ├── src/styles/            # Tailwind entry
-│   ├── src/scripts/           # Alpine components, EasyMDE init
+│   ├── src/script/           # Alpine components, EasyMDE init
 │   └── dist/                  # prebuilt admin assets, served statically
 ├── themes/default/
-├── scripts/
+├── script/
 │   ├── install.sh             # VPS installer
 │   └── Dockerfile
 ├── data/                      # gitignored: pooppress.db, uploads/
@@ -175,7 +175,7 @@ The Phase 1 exit criterion, built instead of implied:
 
 ## Phase 2 — multi-user and theming (complete)
 
-Each item was independent; all shipped. Checks live in `scripts/checks/`.
+Each item was independent; all shipped. Checks live in `script/checks/`.
 
 - **Roles** — the admin/editor/author matrix is enforced in the routes (`canPublish` in `auth.js`): authors see and touch only their own posts, save only `draft`/`review`, and a published post is read-only to its author; publish/unpublish, collections, media deletion and manual rebuilds are editor+. Author-role raw HTML is escaped at build export (`server/build/sanitize.js` — poops renders markdown with marked, which has no per-file `html: false`, so the neutralizing happens before the markup dir is written); the editor's client-side preview applies the same strip for everyone. Check: `p2-roles.test.mjs`
 - **Collections UI** — CRUD pages (landed with M-era admin work). Check: `admin-screens.test.mjs`
@@ -198,7 +198,7 @@ Each item was independent; all shipped. Checks live in `scripts/checks/`.
 
 ## Working rules
 
-- **Testing:** one runnable check per milestone (listed above), as a script in `scripts/checks/`. No test framework until a regression actually bites; then Jest (already in shitstorm-hat lineage), tests only around what broke.
+- **Testing:** one runnable check per milestone (listed above), as a script in `script/checks/`. No test framework until a regression actually bites; then Jest (already in shitstorm-hat lineage), tests only around what broke.
 - **No feature before its milestone.** Anything tempting goes to [IDEAS.md](IDEAS.md) with a revisit trigger.
 - **Admin assets are prebuilt.** `admin/dist` is committed (or built on publish) — installing pooppress never runs Tailwind.
 - **Migrations are append-only** once tagged. Before v0.1.0, editing `001-init.sql` and deleting the dev DB is fine.

@@ -29,7 +29,7 @@ and you have it on two machines.
 ## 2. Docker
 
 ```bash
-docker build -t pooppress -f scripts/Dockerfile .
+docker build -t pooppress -f script/Dockerfile .
 
 # one-time setup (interactive)
 docker run -it -v $PWD/data:/app/data pooppress pooppress init
@@ -93,12 +93,12 @@ they only ever touch the static output.
 
 ## Where things go
 
-| Path | What | Back up? |
-| --- | --- | --- |
-| `data/pooppress.db` | all content and settings | yes |
-| `data/uploads/` | uploaded images + variants | yes |
-| `data/.env` | just `PORT` | no |
-| `themes/` | installed themes | yes if customised |
-| `output/` | generated site | no, it rebuilds |
+| Path                | What                       | Back up?          |
+| ------------------- | -------------------------- | ----------------- |
+| `data/pooppress.db` | all content and settings   | yes               |
+| `data/uploads/`     | uploaded images + variants | yes               |
+| `data/.env`         | just `PORT`                | no                |
+| `themes/`           | installed themes           | yes if customised |
+| `output/`           | generated site             | no, it rebuilds   |
 
 `data/` is created `chmod 700` and `.env` `chmod 600`.
