@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import path from 'node:path'
 import yaml from 'js-yaml'
 import { posts, collections, settings } from '../queries.js'
-import { SITE_ROOT, OUTPUT_DIR, UPLOADS_DIR, PREVIEWS_DIR, themeDir } from '../config.js'
+import { SITE_ROOT, OUTPUT_DIR, UPLOADS_DIR, PREVIEWS_DIR, themeDir, themeManifest } from '../config.js'
 import { randomBytes } from 'node:crypto'
 import { stripRawHtml } from './sanitize.js'
 
@@ -90,9 +90,7 @@ function loadTheme() {
   const slug = settings.get('theme.active', 'default')
   const dir = themeDir(slug)
   if (!existsSync(dir)) throw new Error(`Active theme "${slug}" is not installed (looked in ${dir})`)
-  const manifestPath = path.join(dir, 'theme.json')
-  const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {}
-  return { slug, dir, manifest }
+  return { slug, dir, manifest: themeManifest(slug) }
 }
 
 // Layouts and partials go to underscore dirs — poops skips those for output but

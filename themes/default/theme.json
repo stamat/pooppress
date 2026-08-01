@@ -15,6 +15,10 @@
   },
   "layouts": "layouts/",
   "partials": "partials/",
+  "images": {
+    "sizes": [480, 960, 1600],
+    "formats": ["webp"]
+  },
   "styles": {
     "in": "styles/main.scss",
     "out": "css"

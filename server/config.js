@@ -4,7 +4,7 @@
 // assets, bundled themes) — read-only when installed globally. SITE_ROOT is the
 // directory the user runs it in: data/, output/, and their own themes/plugins.
 import path from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 export const PKG_ROOT = path.resolve(fileURLToPath(import.meta.url), '../..')
@@ -26,6 +26,11 @@ export const ADMIN_VIEWS = path.join(PKG_ROOT, 'admin', 'src', 'markup')
 export function themeDir(slug) {
   const local = path.join(SITE_ROOT, 'themes', slug)
   return existsSync(local) ? local : path.join(PKG_ROOT, 'themes', slug)
+}
+
+export function themeManifest(slug) {
+  const file = path.join(themeDir(slug), 'theme.json')
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
 }
 
 export const PORT = Number(process.env.PORT) || 3000

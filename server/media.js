@@ -3,7 +3,8 @@ import { mkdirSync, writeFileSync, unlinkSync, existsSync, readdirSync } from 'n
 import path from 'node:path'
 import sharp from 'sharp'
 import ImageProcessor from 'poops-images'
-import { UPLOADS_DIR, DATA_DIR } from './config.js'
+import { UPLOADS_DIR, DATA_DIR, themeManifest } from './config.js'
+import { settings } from './queries.js'
 import { ValidationError } from './validate.js'
 
 // No SVG: SVG executes scripts. Add it only if a sanitizer ever earns its place.
@@ -15,7 +16,23 @@ const ALLOWED = {
   avif: { ext: 'avif', mime: 'image/avif' }
 }
 
+// Defaults when the active theme doesn't declare its own. A theme knows its
+// layout widths, so theme.json may override: "images": { "sizes": [480, 960],
+// "formats": ["webp", "avif"] } — same option shapes poops-images takes.
 const SIZES = [{ width: 480 }, { width: 960 }, { width: 1600 }]
+const FORMATS = ['webp']
+
+function imageConfig() {
+  let images
+  try {
+    images = themeManifest(settings.get('theme.active', 'default')).images
+  } catch { /* unreadable manifest — fall back to defaults */ }
+  const sizes = (images?.sizes || [])
+    .map((s) => (typeof s === 'number' ? { width: s } : s))
+    .filter((s) => Number(s?.width) > 0)
+  const formats = (images?.formats || []).filter((f) => typeof f === 'string')
+  return { sizes: sizes.length ? sizes : SIZES, formats: formats.length ? formats : FORMATS }
+}
 
 // The stored path is derived from what sharp actually parsed, never from the
 // client's filename or its claimed content-type.
@@ -49,12 +66,13 @@ export async function storeUpload(buffer, originalName, userId) {
 // One processor run scoped to the single new file (`include` is a glob), so
 // generated variants are never rediscovered as sources on the next upload.
 async function makeVariants(name) {
+  const { sizes, formats } = imageConfig()
   await new ImageProcessor({
     in: UPLOADS_DIR,
     out: UPLOADS_DIR,
     include: name,
-    sizes: SIZES,
-    format: ['webp'],
+    sizes,
+    format: formats,
     cache: false,
     verbose: false
   }).processAll()

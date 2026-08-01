@@ -151,8 +151,8 @@ The core loop. Biggest milestone.
 
 Both hosting artifacts from ARCHITECTURE.md's hosting section:
 
-- `scripts/Dockerfile` (node:22-slim, global install, `CMD ["pooppress", "start"]`), volume at `/app/data`; publish image via GitHub Actions on tag
-- `scripts/install.sh`: Node ≥ 20 check/install, `npm i -g pooppress`, run wizard, write systemd unit (dedicated non-root user), offer Caddy install + 2-line reverse proxy config
+- `script/Dockerfile` (node:22-slim, global install, `CMD ["pooppress", "start"]`), volume at `/app/data`; publish image via GitHub Actions on tag
+- `script/install.sh`: Node ≥ 20 check/install, `npm i -g pooppress`, run wizard, write systemd unit (dedicated non-root user), offer Caddy install + 2-line reverse proxy config
 - Passenger/cPanel doc page: entry file, `process.env.PORT`, `tmp/restart.txt`, `passenger_min_instances 1` — no code work, verify on one cPanel host
 - Test script on a clean Debian VM (manual, once per release)
 
