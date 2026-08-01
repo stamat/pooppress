@@ -1,0 +1,12 @@
+{% extends "admin.html" %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <h1>Media</h1>
+  <form method="post" action="/admin/media/upload" enctype="multipart/form-data" class="flex items-center gap-2">
+    <input class="input w-auto" type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" required>
+    <button class="btn btn-primary" type="submit">Upload</button>
+  </form>
+</div>
+<p class="mb-3 text-xs text-slate-500">JPEG, PNG, GIF, WebP and AVIF. SVG is not accepted — it can carry scripts.</p>
+{% include "media/_grid.html" %}
+{% endblock %}

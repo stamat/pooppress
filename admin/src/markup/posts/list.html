@@ -1,0 +1,28 @@
+{% extends "admin.html" %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <h1>Posts</h1>
+  <a class="btn btn-primary" href="/admin/posts/new">Add new</a>
+</div>
+
+<form class="mb-3 flex flex-wrap items-center gap-2"
+      hx-get="/admin/posts" hx-target="#posts-table" hx-select="#posts-table" hx-swap="outerHTML"
+      hx-trigger="submit, keyup changed delay:300ms from:input[name='search'], change from:select">
+  <input class="input w-64" type="search" name="search" placeholder="Search posts" value="{{ query.search }}">
+  <select class="input w-40" name="status">
+    <option value="">All statuses</option>
+    {% for status in statuses %}
+      <option value="{{ status }}" {% if query.status == status %}selected{% endif %}>{{ status }}</option>
+    {% endfor %}
+  </select>
+  <select class="input w-40" name="collection_id">
+    <option value="">All collections</option>
+    {% for collection in collections %}
+      <option value="{{ collection.id }}" {% if query.collection_id == collection.id | string %}selected{% endif %}>{{ collection.name }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button class="btn" type="submit">Filter</button></noscript>
+</form>
+
+{% include "posts/_table.html" %}
+{% endblock %}

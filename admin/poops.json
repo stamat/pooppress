@@ -1,0 +1,28 @@
+{
+  "scripts": [{
+    "in": "src/scripts/script.js",
+    "out": "dist/scripts/script.js",
+    "options": {
+      "sourcemap": true,
+      "minify": true,
+      "justMinified": false,
+      "format": "iife",
+      "target": "es2020"
+    }
+  }],
+  "postcss": [{
+    "in": "src/styles/tailwind.css",
+    "out": "dist/styles/tailwind.css",
+    "options": {
+      "plugins": ["@tailwindcss/postcss"],
+      "minify": true,
+      "justMinified": false
+    }
+  }],
+  "copy": [
+    { "in": "src/static", "out": "dist" },
+    { "in": "node_modules/easymde/dist/easymde.min.css", "out": "dist/styles" }
+  ],
+  "watch": ["src"],
+  "includePaths": ["node_modules"]
+}

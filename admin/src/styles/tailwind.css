@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* dist/ is generated — point Tailwind at the sources it should scan */
+@source "../";
+
+/* Loosely WordPress: dark sidebar, light content, boring forms. */
+@layer base {
+  body { @apply bg-slate-100 text-slate-800 font-sans text-sm; }
+  h1 { @apply text-xl font-semibold text-slate-900; }
+  h2 { @apply text-base font-semibold text-slate-900; }
+  a { @apply text-sky-700 hover:text-sky-900; }
+  code { @apply rounded bg-slate-200 px-1 py-0.5 text-xs; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center gap-1.5 rounded border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50; }
+  .btn-primary { @apply border-sky-700 bg-sky-700 text-white hover:bg-sky-800 hover:text-white; }
+  .btn-danger { @apply border-red-300 text-red-700 hover:bg-red-50; }
+  .input { @apply w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 outline-none focus:border-sky-600 focus:ring-1 focus:ring-sky-600; }
+  .label { @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .card { @apply rounded border border-slate-200 bg-white shadow-sm; }
+  .nav-link { @apply flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-slate-800 hover:text-white; }
+  .nav-link-active { @apply bg-sky-700 text-white hover:bg-sky-700; }
+  .badge { @apply rounded-full px-2 py-0.5 text-xs font-medium; }
+  .table-row-actions { @apply invisible text-xs group-hover:visible; }
+}
+
+/* EasyMDE ships its own CSS (copied to styles/easymde.min.css); only the
+   surrounding chrome needs to match the admin. */
+.EasyMDEContainer .CodeMirror { @apply rounded-b border-slate-300 text-sm; }
+.editor-toolbar { @apply rounded-t border-slate-300; }
+
+/* EasyMDE labels its toolbar with Font Awesome classes and we don't ship Font
+   Awesome — the admin CSP allows no remote fonts, and a webfont for ten glyphs
+   is a poor trade. Draw them as text instead. */
+.editor-toolbar button::before {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.editor-toolbar button.fa-bold::before { content: "B"; font-weight: 800; }
+.editor-toolbar button.fa-italic::before { content: "I"; font-style: italic; font-weight: 600; }
+.editor-toolbar button.fa-header::before { content: "H"; font-weight: 700; }
+.editor-toolbar button.fa-quote-left::before { content: "❝"; }
+.editor-toolbar button.fa-list-ul::before { content: "•—"; letter-spacing: -0.05em; }
+.editor-toolbar button.fa-list-ol::before { content: "1."; }
+.editor-toolbar button.fa-link::before { content: "🔗"; }
+.editor-toolbar button.fa-eye::before { content: "👁"; }
+.editor-toolbar button.fa-columns::before { content: "⫿⫿"; letter-spacing: -0.1em; }
+.editor-toolbar button.fa-arrows-alt::before { content: "⛶"; }

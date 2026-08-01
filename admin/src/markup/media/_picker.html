@@ -1,0 +1,14 @@
+{# Media picker modal — opened from the editor toolbar, grid loaded by htmx. #}
+<div x-ref="media" x-data="{ open: false }" @show="open = true; $refs.grid.dispatchEvent(new Event('load-media'))"
+     x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-6" style="display:none">
+  <div class="card flex max-h-full w-full max-w-3xl flex-col p-4" @click.outside="open = false">
+    <div class="mb-3 flex items-center justify-between">
+      <h2>Media</h2>
+      <button class="btn" type="button" @click="open = false">Close</button>
+    </div>
+    <div class="overflow-y-auto" x-ref="grid"
+         hx-get="/admin/media/picker" hx-trigger="load-media" hx-swap="innerHTML">
+      <p class="text-slate-500">Loading…</p>
+    </div>
+  </div>
+</div>

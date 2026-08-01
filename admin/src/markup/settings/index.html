@@ -1,0 +1,32 @@
+{% extends "admin.html" %}
+{% block content %}
+<h1 class="mb-4">Settings</h1>
+<form method="post" action="/admin/settings" class="grid gap-4 lg:grid-cols-2">
+  <div class="card p-4">
+    <h2 class="mb-3">Site</h2>
+    {% for key in siteKeys %}
+      <label class="label" for="{{ key }}">{{ key | replace('site.', '') }}</label>
+      <input class="input mb-3" id="{{ key }}" name="{{ key }}" value="{{ values[key] or '' }}">
+    {% endfor %}
+    <p class="text-xs text-slate-500">The site URL is used for canonical links, the sitemap and RSS.</p>
+  </div>
+
+  <div class="card h-fit p-4">
+    <h2 class="mb-3">Deploy</h2>
+    <label class="label" for="deploy.method">Method</label>
+    <select class="input mb-3" id="deploy.method" name="deploy.method">
+      <option value="copy" {% if deploy.method == 'copy' %}selected{% endif %}>copy to a directory</option>
+      <option value="rsync" {% if deploy.method == 'rsync' %}selected{% endif %}>rsync over ssh</option>
+    </select>
+    <label class="label" for="deploy.target">Target directory (copy)</label>
+    <input class="input mb-3" id="deploy.target" name="deploy.target" value="{{ deploy.target or '' }}" placeholder="/var/www/html">
+    <label class="label" for="deploy.host">Host (rsync)</label>
+    <input class="input mb-3" id="deploy.host" name="deploy.host" value="{{ deploy.host or '' }}" placeholder="user@example.com">
+    <label class="label" for="deploy.path">Remote path (rsync)</label>
+    <input class="input mb-3" id="deploy.path" name="deploy.path" value="{{ deploy.path or '' }}" placeholder="/var/www/html">
+    <p class="text-xs text-slate-500">Deploys run from the CLI: <code>pooppress deploy</code>.</p>
+  </div>
+
+  <div><button class="btn btn-primary" type="submit">Save settings</button></div>
+</form>
+{% endblock %}

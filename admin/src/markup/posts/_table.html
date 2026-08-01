@@ -1,0 +1,57 @@
+<div id="posts-table" class="card overflow-hidden">
+  <table class="w-full text-left">
+    <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-3 py-2">Title</th>
+        <th class="px-3 py-2 w-32">Collection</th>
+        <th class="px-3 py-2 w-24">Status</th>
+        <th class="px-3 py-2 w-32">Date</th>
+        <th class="px-3 py-2 w-28"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for post in rows %}
+        <tr class="group hover:bg-slate-50">
+          <td class="px-3 py-2">
+            <a class="font-medium" href="/admin/posts/{{ post.id }}">{{ post.title or '(untitled)' }}</a>
+            <div class="text-xs text-slate-400">/{{ post.collection_slug or '' }}{% if post.collection_slug %}/{% endif %}{{ post.slug }}</div>
+          </td>
+          <td class="px-3 py-2 text-slate-600">{{ post.collection_name or '—' }}</td>
+          <td class="px-3 py-2">
+            <span class="badge {% if post.status == 'published' %}bg-green-100 text-green-800{% elif post.status == 'review' %}bg-amber-100 text-amber-800{% else %}bg-slate-200 text-slate-700{% endif %}">{{ post.status }}</span>
+          </td>
+          <td class="px-3 py-2 text-slate-600">{{ (post.published_at or post.updated_at) | date }}</td>
+          <td class="px-3 py-2">
+            <div class="table-row-actions flex gap-2">
+              <a href="/admin/posts/{{ post.id }}">Edit</a>
+              <form method="post" action="/admin/posts/{{ post.id }}/delete"
+                    hx-post="/admin/posts/{{ post.id }}/delete" hx-confirm="Delete “{{ post.title }}”?">
+                <button class="text-red-700" type="submit">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td class="px-3 py-6 text-center text-slate-500" colspan="5">No posts found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if pages > 1 %}
+    <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-xs text-slate-600">
+      <span>{{ total }} posts · page {{ page }} of {{ pages }}</span>
+      <div class="flex gap-2">
+        {% if page > 1 %}
+          <a hx-get="/admin/posts?page={{ page - 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}"
+             hx-target="#posts-table" hx-swap="outerHTML"
+             href="/admin/posts?page={{ page - 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}">Previous</a>
+        {% endif %}
+        {% if page < pages %}
+          <a hx-get="/admin/posts?page={{ page + 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}"
+             hx-target="#posts-table" hx-swap="outerHTML"
+             href="/admin/posts?page={{ page + 1 }}&search={{ query.search | urlencode }}&status={{ query.status | urlencode }}&collection_id={{ query.collection_id | urlencode }}">Next</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>

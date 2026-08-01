@@ -1,0 +1,47 @@
+{% extends "admin.html" %}
+{% block content %}
+<h1 class="mb-1">Themes</h1>
+<p class="mb-4 text-xs text-slate-500">Installing a theme is dropping a directory into <code>themes/</code>. This list is a filesystem scan.</p>
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {% for theme in themes %}
+    <div class="card p-4 {% if theme.slug == active %}border-sky-400{% endif %}">
+      <div class="flex items-start justify-between">
+        <div>
+          <h2>{{ theme.name }}</h2>
+          <div class="text-xs text-slate-500">{{ theme.slug }} {% if theme.version %}· v{{ theme.version }}{% endif %}</div>
+        </div>
+        {% if theme.slug == active %}<span class="badge bg-green-100 text-green-800">active</span>{% endif %}
+      </div>
+      {% if theme.description %}<p class="mt-2 text-slate-600">{{ theme.description }}</p>{% endif %}
+
+      {% if theme.slug != active %}
+        <form class="mt-3" method="post" action="/admin/themes/{{ theme.slug }}/activate">
+          <button class="btn" type="submit">Activate</button>
+        </form>
+      {% elif theme.configSchema %}
+        <form class="mt-3 border-t border-slate-100 pt-3" method="post" action="/admin/themes/{{ theme.slug }}/config">
+          {% for key, field in theme.configSchema %}
+            {% set current = config[key] if config[key] is defined else field.default %}
+            <label class="label" for="config-{{ key }}">{{ field.label or key }}</label>
+            {% if field.type == 'boolean' %}
+              <input class="mb-3" id="config-{{ key }}" type="checkbox" name="config.{{ key }}" {% if current %}checked{% endif %}>
+            {% elif field.type == 'number' %}
+              <input class="input mb-3" id="config-{{ key }}" type="number" name="config.{{ key }}" value="{{ current }}">
+            {% elif field.type == 'color' %}
+              <input class="input mb-3 h-9" id="config-{{ key }}" type="color" name="config.{{ key }}" value="{{ current }}">
+            {% elif field.type == 'select' %}
+              <select class="input mb-3" id="config-{{ key }}" name="config.{{ key }}">
+                {% for option in field.options %}<option value="{{ option }}" {% if current == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+              </select>
+            {% else %}
+              <input class="input mb-3" id="config-{{ key }}" name="config.{{ key }}" value="{{ current }}">
+            {% endif %}
+          {% endfor %}
+          <button class="btn btn-primary" type="submit">Save theme settings</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

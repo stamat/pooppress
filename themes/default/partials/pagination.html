@@ -1,0 +1,11 @@
+{% if page.totalPages > 1 %}
+  <nav class="pagination" aria-label="Pagination">
+    {% if page.prevPageUrl %}
+      <a class="prev" href="{{ relativePathPrefix }}{{ page.prevPageUrl }}">← Newer</a>
+    {% endif %}
+    <span class="page-count">Page {{ page.pageNumber }} of {{ page.totalPages }}</span>
+    {% if page.nextPageUrl %}
+      <a class="next" href="{{ relativePathPrefix }}{{ page.nextPageUrl }}">Older →</a>
+    {% endif %}
+  </nav>
+{% endif %}

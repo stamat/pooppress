@@ -1,0 +1,12 @@
+<header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-2">
+  <div class="flex items-center gap-4">
+    <a href="{{ site.url or '/' }}" class="font-medium">{{ site.title or 'pooppress' }}</a>
+    {% include "build-status.html" %}
+  </div>
+  <div class="flex items-center gap-3 text-slate-600">
+    {% if user %}
+      <span>{{ user.display_name or user.email }}</span>
+      <form method="post" action="/admin/logout"><button class="btn" type="submit">Log out</button></form>
+    {% endif %}
+  </div>
+</header>

@@ -1,0 +1,66 @@
+{% extends "admin.html" %}
+{% block content %}
+<h1 class="mb-4">Collections</h1>
+{% if error %}<div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800">{{ error }}</div>{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-[1fr_20rem]">
+  <div class="card overflow-hidden">
+    <table class="w-full text-left">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Slug</th><th class="px-3 py-2 w-20">Posts</th><th class="px-3 py-2 w-24">Per page</th><th class="px-3 py-2 w-20"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for row in rows %}
+          <tr class="group hover:bg-slate-50" x-data="{ editing: false }">
+            <td class="px-3 py-2">
+              <span x-show="!editing" class="font-medium">{{ row.name }}</span>
+              <form x-show="editing" x-cloak method="post" action="/admin/collections/{{ row.id }}" class="grid gap-2 py-2 sm:grid-cols-2">
+                <input class="input" name="name" value="{{ row.name }}" required>
+                <input class="input" name="slug" value="{{ row.slug }}" required>
+                <input class="input" name="paginate" type="number" min="1" value="{{ row.paginate or '' }}" placeholder="posts per page">
+                <input class="input" name="permalink" value="{{ row.permalink or '' }}" placeholder="/:year/:month/:slug">
+                <select class="input" name="sort_order">
+                  <option value="desc" {% if row.sort_order == 'desc' %}selected{% endif %}>newest first</option>
+                  <option value="asc" {% if row.sort_order == 'asc' %}selected{% endif %}>oldest first</option>
+                </select>
+                <div class="flex gap-2">
+                  <button class="btn btn-primary" type="submit">Save</button>
+                  <button class="btn" type="button" @click="editing = false">Cancel</button>
+                </div>
+              </form>
+            </td>
+            <td class="px-3 py-2 text-slate-600">/{{ row.slug }}</td>
+            <td class="px-3 py-2">{{ row.post_count }}</td>
+            <td class="px-3 py-2">{{ row.paginate or '—' }}</td>
+            <td class="px-3 py-2">
+              <div class="table-row-actions flex gap-2">
+                <button type="button" @click="editing = !editing">Edit</button>
+                <form method="post" action="/admin/collections/{{ row.id }}/delete"
+                      @submit="if (!confirm('Delete {{ row.name }}?')) $event.preventDefault()">
+                  <button class="text-red-700" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td class="px-3 py-6 text-center text-slate-500" colspan="5">No collections yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <form class="card h-fit p-4" method="post" action="/admin/collections">
+    <h2 class="mb-3">Add collection</h2>
+    <label class="label" for="name">Name</label>
+    <input class="input mb-3" id="name" name="name" value="{{ form.name or '' }}" required>
+    <label class="label" for="slug">Slug</label>
+    <input class="input mb-3" id="slug" name="slug" value="{{ form.slug or '' }}" placeholder="blog" required>
+    <label class="label" for="paginate">Posts per page</label>
+    <input class="input mb-3" id="paginate" name="paginate" type="number" min="1" value="{{ form.paginate or 10 }}">
+    <label class="label" for="permalink">Permalink pattern</label>
+    <input class="input mb-1" id="permalink" name="permalink" value="{{ form.permalink or '' }}" placeholder="/:year/:month/:slug">
+    <p class="mb-3 text-xs text-slate-500">Optional. Tokens: <code>:year</code> <code>:month</code> <code>:day</code> <code>:slug</code>, nested under the collection.</p>
+    <button class="btn btn-primary w-full justify-center" type="submit">Create</button>
+  </form>
+</div>
+{% endblock %}

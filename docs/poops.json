@@ -1,0 +1,42 @@
+{
+  "styles": [{
+    "in": "node_modules/poops-docs-theme/scss/docs.scss",
+    "out": "docs/dist/css/docs.css",
+    "options": { "minify": true, "justMinified": true }
+  }],
+  "scripts": [{
+    "in": "node_modules/poops-docs-theme/src/docs.ts",
+    "out": "docs/dist/js/docs.js",
+    "options": { "minify": true, "justMinified": true, "format": "iife", "target": "es2019" }
+  }],
+  "markup": {
+    "in": "docs/src/markup",
+    "out": "docs/dist",
+    "options": {
+      "site": {
+        "title": "pooppress",
+        "brand": "pooppress",
+        "brandMark": "💩",
+        "description": "A CMS that generates static sites. WordPress's install-anywhere story, without the per-request PHP.",
+        "url": "https://pooppress.dev",
+        "repo": "https://github.com/stamat/pooppress",
+        "branch": "main",
+        "lang": "en",
+        "links": [
+          { "label": "Docs", "url": "docs/" },
+          { "label": "Poops", "url": "https://github.com/stamat/poops" }
+        ]
+      },
+      "includePaths": ["_layouts", "_partials"],
+      "dateFormat": "MMM D, YYYY",
+      "searchIndex": "search-index.json",
+      "sitemap": "sitemap.xml",
+      "robots": "robots.txt",
+      "nav": { "out": "nav.json", "root": "docs", "collections": "index" }
+    }
+  },
+  "serve": { "port": 4041, "base": "docs/dist" },
+  "livereload": true,
+  "watch": ["docs/src"],
+  "includePaths": ["node_modules"]
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in · pooppress</title>
+  <link rel="icon" type="image/png" href="/admin/assets/static/poop.png">
+  <link rel="stylesheet" href="/admin/assets/styles/tailwind.min.css">
+</head>
+<body class="flex min-h-screen items-center justify-center bg-slate-900">
+  <form method="post" action="/admin/login" class="card w-80 p-6">
+    <h1 class="mb-4 flex items-center gap-2">
+      <img src="/admin/assets/static/poop.png" alt="" width="24" height="24"> pooppress
+    </h1>
+    {% if error %}<p class="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800">{{ error }}</p>{% endif %}
+    <label class="label" for="email">Email</label>
+    <input class="input mb-3" id="email" name="email" type="email" autocomplete="username" required autofocus>
+    <label class="label" for="password">Password</label>
+    <input class="input mb-4" id="password" name="password" type="password" autocomplete="current-password" required>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button class="btn btn-primary w-full justify-center" type="submit">Log in</button>
+  </form>
+</body>
+</html>

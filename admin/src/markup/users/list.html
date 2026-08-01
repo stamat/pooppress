@@ -1,0 +1,58 @@
+{% extends "admin.html" %}
+{% block content %}
+<h1 class="mb-4">Users</h1>
+{% if error %}<div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800">{{ error }}</div>{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-[1fr_20rem]">
+  <div class="card overflow-hidden">
+    <table class="w-full text-left">
+      <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+        <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Email</th><th class="px-3 py-2 w-28">Role</th><th class="px-3 py-2 w-40"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for row in rows %}
+          <tr class="group hover:bg-slate-50" x-data="{ editing: false }">
+            <td class="px-3 py-2 font-medium">{{ row.display_name or '—' }}</td>
+            <td class="px-3 py-2 text-slate-600">{{ row.email }}</td>
+            <td class="px-3 py-2"><span class="badge bg-slate-200 text-slate-700">{{ row.role }}</span></td>
+            <td class="px-3 py-2">
+              <div class="table-row-actions flex gap-2">
+                <button type="button" @click="editing = !editing">Edit</button>
+                <form method="post" action="/admin/users/{{ row.id }}/delete"
+                      @submit="if (!confirm('Delete {{ row.email }}?')) $event.preventDefault()">
+                  <button class="text-red-700" type="submit">Delete</button>
+                </form>
+              </div>
+              <form x-show="editing" x-cloak method="post" action="/admin/users/{{ row.id }}" class="mt-2 grid gap-2">
+                <input class="input" name="display_name" value="{{ row.display_name }}" placeholder="display name">
+                <input class="input" name="email" value="{{ row.email }}" type="email">
+                <select class="input" name="role">
+                  {% for role in roles %}<option value="{{ role }}" {% if row.role == role %}selected{% endif %}>{{ role }}</option>{% endfor %}
+                </select>
+                <input class="input" name="password" type="password" placeholder="new password (optional)" autocomplete="new-password">
+                <button class="btn btn-primary" type="submit">Save</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <form class="card h-fit p-4" method="post" action="/admin/users">
+    <h2 class="mb-3">Add user</h2>
+    <label class="label" for="display_name">Display name</label>
+    <input class="input mb-3" id="display_name" name="display_name" value="{{ form.display_name or '' }}">
+    <label class="label" for="email">Email</label>
+    <input class="input mb-3" id="email" name="email" type="email" value="{{ form.email or '' }}" required>
+    <label class="label" for="password">Password</label>
+    <input class="input mb-3" id="password" name="password" type="password" autocomplete="new-password" required>
+    <label class="label" for="role">Role</label>
+    <select class="input mb-3" id="role" name="role">
+      {% for role in roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}
+    </select>
+    <p class="mb-3 text-xs text-slate-500">admin: everything · editor: all content · author: own posts</p>
+    <button class="btn btn-primary w-full justify-center" type="submit">Create user</button>
+  </form>
+</div>
+{% endblock %}

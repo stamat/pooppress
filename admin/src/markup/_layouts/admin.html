@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title }} · {{ site.title or 'pooppress' }}</title>
+  <link rel="icon" type="image/png" href="/admin/assets/static/poop.png">
+  <link rel="stylesheet" href="/admin/assets/styles/tailwind.min.css">
+  <link rel="stylesheet" href="/admin/assets/styles/easymde.min.css">
+  <script defer src="/admin/assets/scripts/script.min.js"></script>
+</head>
+<body class="min-h-screen">
+  <div class="flex min-h-screen">
+    {% include "sidebar.html" %}
+    <div class="flex min-w-0 flex-1 flex-col">
+      {% include "topbar.html" %}
+      <main class="flex-1 p-6">
+        {% if flash %}<div class="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ flash }}</div>{% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+</body>
+</html>

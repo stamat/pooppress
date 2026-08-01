@@ -1,0 +1,21 @@
+<div class="flex items-center gap-2 text-xs" x-data="{
+  state: 'idle', error: null, timer: null,
+  async poll () {
+    try {
+      const res = await fetch('/api/build/status')
+      if (!res.ok) return
+      const data = await res.json()
+      this.state = data.state
+      this.error = data.error
+    } catch (e) { /* server restarting — next tick retries */ }
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => this.poll(), this.state === 'building' ? 2000 : 15000)
+  },
+  async rebuild () { await fetch('/api/build', { method: 'POST' }); this.state = 'building'; this.poll() }
+}" x-init="poll()">
+  <span class="badge"
+    :class="{ 'bg-slate-200 text-slate-700': state === 'idle', 'bg-sky-100 text-sky-800': state === 'building', 'bg-red-100 text-red-800': state === 'error' }"
+    x-text="state === 'building' ? 'building…' : (state === 'error' ? 'build failed' : 'built')"></span>
+  <button class="btn px-2 py-0.5" @click="rebuild()" :disabled="state === 'building'">Rebuild</button>
+  <span class="text-red-700" x-show="error" x-text="error"></span>
+</div>

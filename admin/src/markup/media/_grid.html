@@ -1,0 +1,29 @@
+{# x-data so Alpine processes the buttons below even when this grid is rendered
+   on its own page, outside the picker modal's component. #}
+<div id="media-grid" x-data class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+  {% for item in rows %}
+    <figure id="media-{{ item.id }}" class="card overflow-hidden">
+      <img class="h-28 w-full object-cover" src="/{{ item.path }}" alt="{{ item.alt_text }}" loading="lazy">
+      <figcaption class="p-2 text-xs">
+        <div class="truncate text-slate-600" title="{{ item.original_name }}">{{ item.original_name }}</div>
+        <div class="text-slate-400">{{ item.width }}×{{ item.height }} · {{ item.variants.length }} variants</div>
+        <div class="mt-1 flex items-center gap-2">
+          {% if picker %}
+            <button class="btn px-2 py-0.5" type="button"
+                    @click="$dispatch('media-picked', { path: '/{{ item.path }}', alt: {{ item.alt_text | dump }} }); open = false">Insert</button>
+          {% else %}
+            <button class="btn px-2 py-0.5" type="button"
+                    @click="navigator.clipboard.writeText('![' + {{ item.alt_text | dump }} + '](/{{ item.path }})')">Copy markdown</button>
+            <form method="post" action="/admin/media/{{ item.id }}/delete"
+                  hx-post="/admin/media/{{ item.id }}/delete" hx-target="#media-grid" hx-swap="outerHTML"
+                  hx-confirm="Delete this image and its variants?">
+              <button class="text-red-700" type="submit">Delete</button>
+            </form>
+          {% endif %}
+        </div>
+      </figcaption>
+    </figure>
+  {% else %}
+    <p class="col-span-full py-6 text-center text-slate-500">No media yet.</p>
+  {% endfor %}
+</div>

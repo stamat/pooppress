@@ -1,0 +1,22 @@
+{
+  "name": "Default",
+  "version": "1.0.0",
+  "author": "stamat",
+  "description": "Minimal, readable blog theme — hand-written SCSS, no dependencies.",
+  "config": {
+    "accentColor": "#1d4ed8",
+    "showAuthor": true,
+    "footerText": "Built with pooppress."
+  },
+  "configSchema": {
+    "accentColor": { "type": "color", "default": "#1d4ed8", "label": "Accent color" },
+    "showAuthor": { "type": "boolean", "default": true, "label": "Show author on posts" },
+    "footerText": { "type": "text", "default": "Built with pooppress.", "label": "Footer text" }
+  },
+  "layouts": "layouts/",
+  "partials": "partials/",
+  "styles": {
+    "in": "styles/main.scss",
+    "out": "css"
+  }
+}

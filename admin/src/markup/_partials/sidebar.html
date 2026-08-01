@@ -1,0 +1,19 @@
+<nav class="w-48 shrink-0 bg-slate-900 py-3 text-slate-300">
+  <a href="/admin" class="mb-3 flex items-center gap-2 px-4 text-base font-semibold text-white hover:text-white">
+    <img src="/admin/assets/static/poop.png" alt="" width="20" height="20"> pooppress
+  </a>
+  {% set nav = [
+    { href: '/admin', label: 'Dashboard', key: 'dashboard' },
+    { href: '/admin/posts', label: 'Posts', key: 'posts' },
+    { href: '/admin/media', label: 'Media', key: 'media' },
+    { href: '/admin/collections', label: 'Collections', key: 'collections' },
+    { href: '/admin/themes', label: 'Themes', key: 'themes', admin: true },
+    { href: '/admin/users', label: 'Users', key: 'users', admin: true },
+    { href: '/admin/settings', label: 'Settings', key: 'settings', admin: true }
+  ] %}
+  {% for item in nav %}
+    {% if not item.admin or user.role == 'admin' %}
+      <a href="{{ item.href }}" class="nav-link {% if page.nav == item.key %}nav-link-active{% endif %}">{{ item.label }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>

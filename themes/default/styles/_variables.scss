@@ -1,0 +1,10 @@
+// Theme config values that need to reach CSS are duplicated here; SCSS is
+// compiled once per build, so a config change simply rebuilds.
+$accent: #1d4ed8 !default;
+$ink: #1a1a1a !default;
+$muted: #6b7280 !default;
+$rule: #e5e7eb !default;
+$bg: #ffffff !default;
+$measure: 42rem !default;
+$font-body: ui-serif, Georgia, "Times New Roman", serif !default;
+$font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !default;

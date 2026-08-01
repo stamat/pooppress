@@ -1,0 +1,9 @@
+<article class="post-card">
+  <h2><a href="{{ relativePathPrefix }}{{ post.url }}">{{ post.title }}</a></h2>
+  <p class="post-meta">
+    {% if post.date %}<time datetime="{{ post.date }}">{{ post.date | date }}</time>{% endif %}
+    {% if theme.showAuthor and post.author %} · <span class="author">{{ post.author }}</span>{% endif %}
+  </p>
+  {% if post.excerpt %}<p class="post-excerpt">{{ post.excerpt }}</p>{% endif %}
+  <a class="read-more" href="{{ relativePathPrefix }}{{ post.url }}">Read more →</a>
+</article>

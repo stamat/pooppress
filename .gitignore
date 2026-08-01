@@ -1,0 +1,20 @@
+node_modules/
+
+# Build output (admin/dist, docs/dist) — regenerate with `npm run admin:build`
+dist/
+
+# Runtime site data: SQLite db + uploads, and the generated static site
+data/
+output/
+output.tmp/
+output.old/
+.pooppress-build/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+
+.DS_Store

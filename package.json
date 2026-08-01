@@ -1,0 +1,50 @@
+{
+  "name": "pooppress",
+  "version": "0.1.0-dev",
+  "description": "A CMS that generates static sites",
+  "type": "module",
+  "license": "MIT",
+  "author": "stamat",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "pooppress": "bin/pooppress.js"
+  },
+  "files": [
+    "bin",
+    "server",
+    "themes",
+    "admin/dist",
+    "admin/src/markup",
+    "app.js",
+    "scripts/install.sh",
+    "scripts/Dockerfile"
+  ],
+  "scripts": {
+    "dev": "node bin/pooppress.js start",
+    "dev:admin": "cd admin && npx poops",
+    "init": "node bin/pooppress.js init",
+    "build": "node bin/pooppress.js build",
+    "start": "node bin/pooppress.js start",
+    "admin:build": "cd admin && npx poops --build -q",
+    "check": "node --test 'scripts/checks/*.test.mjs'",
+    "docs:build": "npx poops --build -q -c docs/poops.json",
+    "docs:dev": "npx poops -c docs/poops.json"
+  },
+  "dependencies": {
+    "argoyle": "^1.0.1",
+    "better-sqlite3": "^12.6.0",
+    "express": "^5.1.0",
+    "fast-xml-parser": "^5.10.1",
+    "js-yaml": "^4.1.0",
+    "multer": "^2.0.2",
+    "nunjucks": "^3.2.4",
+    "poops": "^2.0.0",
+    "poops-images": "^1.2.1",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "poops-docs-theme": "^1.1.2"
+  }
+}

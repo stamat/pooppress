@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang or 'en' }}">
+<head>
+  {% include "meta.html" %}
+  <link rel="stylesheet" href="{{ relativePathPrefix }}css/main.min.css">
+</head>
+<body>
+  {% include "header.html" %}
+  <main class="wrap">
+    {# Layouts fill `main`; the page's own markdown always lands in `content`. #}
+    {% block main %}{% block content %}{% endblock %}{% endblock %}
+  </main>
+  {% include "footer.html" %}
+</body>
+</html>
