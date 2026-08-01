@@ -2,7 +2,7 @@
 // rebuilds the site. Safe to rerun — skips slugs that already exist.
 import sharp from 'sharp'
 import { storeUpload } from './server/media.js'
-import { posts, media, collections } from './server/queries.js'
+import { posts, media, collections, settings } from './server/queries.js'
 import { sql } from './server/db.js'
 
 const AUTHOR_ID = 1
@@ -228,6 +228,18 @@ for (const post of POSTS) {
 
 // 6 posts, 4 per page → pagination gets demoed too.
 collections.update(BLOG_ID, { paginate: 4 })
+
+// Curated header menu (internal urls site-relative, external with scheme) —
+// only when empty, so a rerun never clobbers menu edits made in the admin.
+if (!(settings.get('menu') || []).length) {
+  settings.set('menu', [
+    { label: 'Blog', url: 'blog' },
+    { label: 'About', url: 'about.html' },
+    { label: 'Contact', url: 'contact.html' },
+    { label: 'poops', url: 'https://github.com/stamat/poops' }
+  ])
+  seeded.push('menu')
+}
 
 console.log('seeded:', seeded.join(', ') || 'nothing (all slugs existed)')
 
