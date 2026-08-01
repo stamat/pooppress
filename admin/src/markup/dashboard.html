@@ -1,11 +1,17 @@
 {% extends "admin.html" %}
 {% block content %}
-<h1 class="mb-4">Dashboard</h1>
+<div class="mb-4 flex items-center justify-between">
+  <h1>Dashboard</h1>
+  <div class="flex gap-2">
+    <a href="/admin/media" class="btn">Upload media</a>
+    <a href="/admin/posts/new" class="btn btn-primary">New post</a>
+  </div>
+</div>
 <div class="grid gap-4 sm:grid-cols-3">
   {% for stat in stats %}
-    <a href="{{ stat.href }}" class="card block p-4 hover:border-sky-300">
+    <a href="{{ stat.href }}" class="card block p-4 transition-colors hover:border-sky-300">
       <div class="text-xs uppercase tracking-wide text-slate-500">{{ stat.label }}</div>
-      <div class="mt-1 text-2xl font-semibold text-slate-900">{{ stat.value }}</div>
+      <div class="mt-1 text-3xl font-semibold tabular-nums text-slate-900">{{ stat.value }}</div>
     </a>
   {% endfor %}
 </div>
@@ -14,9 +20,12 @@
   {% if recent.length %}
     <ul class="divide-y divide-slate-100">
       {% for post in recent %}
-        <li class="flex items-center justify-between py-2">
-          <a href="/admin/posts/{{ post.id }}">{{ post.title or '(untitled)' }}</a>
-          <span class="text-xs text-slate-500">{{ post.status }} · {{ post.updated_at | date }}</span>
+        <li class="flex items-center justify-between gap-3 py-2">
+          <a href="/admin/posts/{{ post.id }}" class="truncate">{{ post.title or '(untitled)' }}</a>
+          <span class="flex shrink-0 items-center gap-2 text-xs text-slate-500">
+            <span class="badge badge-{{ post.status }}">{{ post.status }}</span>
+            {{ post.updated_at | date }}
+          </span>
         </li>
       {% endfor %}
     </ul>

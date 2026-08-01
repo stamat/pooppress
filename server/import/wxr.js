@@ -101,7 +101,11 @@ function importAuthors(channel) {
     const user = existing || users.create({
       email,
       password_hash: hashPassword(randomBytes(32).toString('hex')),
-      role: 'author',
+      // WXR carries no roles. Imported posts keep their raw HTML through the
+      // author-role markdown strip only if their owner outranks 'author' —
+      // and a migrating admin has already vetted this content. Demote after
+      // the password reset if someone shouldn't hold editor.
+      role: 'editor',
       display_name: text(author['wp:author_display_name']) || login
     })
     map.set(login, user.id)

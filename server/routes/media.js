@@ -4,6 +4,7 @@ import { media } from '../queries.js'
 import { storeUpload, deleteFiles } from '../media.js'
 import { ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
+import { requireAuth } from '../auth.js'
 
 // Memory storage: the file is validated by parsing it before anything is
 // written, so it never touches disk under an untrusted name.
@@ -12,6 +13,9 @@ const isHtmx = (req) => req.get('HX-Request') === 'true'
 
 export function mediaRoutes() {
   const router = Router()
+  // Deleting media can break other people's posts — editor territory. Upload
+  // and alt text stay open to authors, who need them for their own drafts.
+  const editorOnly = requireAuth('editor')
 
   router.get('/admin/media', (req, res) => {
     res.render('media/list.html', { page: { title: 'Media', nav: 'media' }, ...media.list({ page: req.query.page || 1 }) })
@@ -32,7 +36,7 @@ export function mediaRoutes() {
     }
   })
 
-  router.post('/admin/media/:id/delete', (req, res, next) => {
+  router.post('/admin/media/:id/delete', editorOnly, (req, res, next) => {
     const row = media.get(Number(req.params.id))
     if (!row) return next()
     try {
@@ -75,7 +79,7 @@ export function mediaRoutes() {
     }
   })
 
-  router.delete('/api/media/:id', (req, res, next) => {
+  router.delete('/api/media/:id', editorOnly, (req, res, next) => {
     const row = media.get(Number(req.params.id))
     if (!row) return res.status(404).json({ error: 'not found' })
     try {

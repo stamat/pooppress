@@ -76,6 +76,19 @@ test('themes are discovered from the filesystem, never from a table', async () =
   await app.form('/admin/themes/default/activate', {})
 })
 
+test('theme config saves through the schema with real types', async () => {
+  const before = builds.requested
+  // showAuthor is a checkbox left unchecked — the field is simply absent.
+  const res = await app.form('/admin/themes/default/config', {
+    'config.accentColor': '#ff0000',
+    'config.footerText': 'hand-rolled'
+  })
+  assert.equal(res.status, 302)
+  const config = q.settings.get('theme.config')
+  assert.deepEqual(config, { accentColor: '#ff0000', showAuthor: false, footerText: 'hand-rolled' })
+  assert.equal(builds.requested, before + 1, 'theme config shapes every page, so it builds')
+})
+
 test('only admins manage users', async () => {
   const created = await app.form('/admin/users', { email: 'editor@example.com', password: 'another pw', role: 'editor', display_name: 'Editor' })
   assert.equal(created.status, 302)

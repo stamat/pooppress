@@ -132,7 +132,7 @@ export const posts = {
   // The build's one source of truth for what is public.
   published: () => sql(`
     SELECT p.*, c.slug AS collection_slug, c.name AS collection_name, c.permalink, c.layout AS collection_layout,
-           u.display_name AS author_name
+           u.display_name AS author_name, u.role AS author_role
     FROM posts p
     LEFT JOIN collections c ON c.id = p.collection_id
     LEFT JOIN users u ON u.id = p.author_id
@@ -141,7 +141,20 @@ export const posts = {
 
   // Scheduling (Phase 2) asks this: has anything come due since the last build?
   nextScheduled: () => sql(`
-    SELECT MIN(published_at) AS at FROM posts WHERE status = 'published' AND published_at > ?`).get(nowSql()).at
+    SELECT MIN(published_at) AS at FROM posts WHERE status = 'published' AND published_at > ?`).get(nowSql()).at,
+
+  dueBetween: (a, b) => sql(`
+    SELECT COUNT(*) AS n FROM posts WHERE status = 'published' AND published_at > ? AND published_at <= ?`).get(a, b).n,
+
+  // A single post with the same joins the build gets — any status, for the
+  // draft-preview build.
+  forPreview: (id) => parsePost(sql(`
+    SELECT p.*, c.slug AS collection_slug, c.name AS collection_name, c.permalink, c.layout AS collection_layout,
+           u.display_name AS author_name, u.role AS author_role
+    FROM posts p
+    LEFT JOIN collections c ON c.id = p.collection_id
+    LEFT JOIN users u ON u.id = p.author_id
+    WHERE p.id = ?`).get(id))
 }
 
 export const media = {

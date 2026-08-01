@@ -31,7 +31,7 @@ Flags:
 | Posts | posts in the target collection |
 | Pages | standalone posts (no collection) |
 | `publish` / `draft` / `pending` / `private` | `published` / `draft` / `review` / `draft` |
-| Authors | users with a locked password |
+| Authors | `editor`-role users with a locked password |
 | Categories, tags | `meta.categories`, `meta.tags` |
 | Attachments | downloaded into `data/uploads/`, body URLs rewritten |
 | Old permalinks | `meta.redirect_from`, built as redirect stubs |
@@ -47,6 +47,11 @@ Nothing is published that wasn't published before: an unknown status becomes a d
 Every imported author gets a real scrypt hash of a random value nobody holds. The account
 exists so posts keep their author, but there is no password to guess. Set one under
 **Users → Edit** for anyone who needs access.
+
+Imported users are created as **editors**, not authors: WXR carries no role information,
+and author-role content has its raw HTML escaped at build time — which would mangle
+imported WordPress bodies, which are HTML. The migrating admin has already vetted this
+content; demote anyone who shouldn't hold editor after resetting their password.
 
 ## Old URLs keep working
 

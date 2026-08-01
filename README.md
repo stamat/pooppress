@@ -42,7 +42,9 @@ node bin/pooppress.js init && node bin/pooppress.js start
 
 Phase 1 is complete: setup wizard, auth, post CRUD with a markdown editor, media with responsive variants, the build bridge, the default theme, packaging, and the WordPress importer. A WordPress blog can migrate.
 
-Phase 2 (roles enforcement, theme config UI, scheduled publishing, draft preview) and Phase 3 (plugins, static search, deploy presets) are described in [DEVELOPMENT.md](DEVELOPMENT.md).
+Phase 2 is complete: the admin/editor/author role matrix is enforced (authors own their drafts, submit for review, and their raw HTML never reaches the build), scheduled posts publish themselves, drafts preview at unguessable token URLs, and collections and theme config have admin UIs. CI runs the checks on every push.
+
+Phase 3 (plugins, static search, deploy presets) is described in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 

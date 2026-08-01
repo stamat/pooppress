@@ -13,6 +13,28 @@ function slugify (title) {
     .slice(0, 200)
 }
 
+// Client twin of server/build/sanitize.js: the editor preview renders with
+// raw HTML neutralized for everyone (ARCHITECTURE §Security) — keep the two
+// in sync by hand, they are the same ~20 lines.
+function stripRawHtml (markdown) {
+  const out = []
+  let fence = null
+  for (const line of String(markdown).split('\n')) {
+    const open = line.match(/^\s{0,3}(`{3,}|~{3,})/)
+    if (fence) {
+      out.push(line)
+      if (open && open[1][0] === fence[0] && open[1].length >= fence.length) fence = null
+      continue
+    }
+    if (open) { fence = open[1]; out.push(line); continue }
+    out.push(line
+      .split(/(`+[^`]*`+)/)
+      .map((part) => part.startsWith('`') ? part : part.replace(/<(?=[a-zA-Z/!?])/g, '&lt;'))
+      .join(''))
+  }
+  return out.join('\n')
+}
+
 Alpine.data('postEditor', (initial = {}) => ({
   title: initial.title || '',
   slug: initial.slug || '',
@@ -26,6 +48,7 @@ Alpine.data('postEditor', (initial = {}) => ({
       autoDownloadFontAwesome: false,
       spellChecker: false,
       status: ['lines', 'words'],
+      previewRender: (text) => this.editor.markdown(stripRawHtml(text)),
       toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', {
         name: 'media',
         title: 'Insert media',

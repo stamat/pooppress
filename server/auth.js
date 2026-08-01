@@ -85,6 +85,10 @@ function parseCookies(header) {
 
 const ROLES = { admin: 3, editor: 2, author: 1 }
 
+// The author role is WordPress's contributor line: own drafts, submit for
+// review. Everything that changes the public site needs this.
+export const canPublish = (user) => user?.role === 'admin' || user?.role === 'editor'
+
 // requireAuth() guards a page; requireAuth('editor') also demands a role rank.
 // API paths get JSON, admin pages get a redirect back to where they were going.
 export function requireAuth(minRole = 'author') {

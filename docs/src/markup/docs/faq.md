@@ -40,8 +40,9 @@ locking, and no merge.
 
 **Where did my scheduled post go?**
 The export only includes `published_at <= now`, so a future-dated post stays out of the
-build until its time. Automatic rebuilds when one comes due are a Phase 2 item; until
-then, `pooppress build` from cron does it.
+build until its time. A sweep on the running server rebuilds within a minute of a post
+coming due. If the server was off at that moment (laptop mode), the post publishes the
+next time it starts — or `pooppress build` does it headlessly.
 
 **Can I edit `output/`?**
 You can, and the next build will erase it. Every build starts from an empty tree — that is

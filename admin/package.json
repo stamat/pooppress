@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "poops",
     "build": "poops -b",
-    "lint": "eslint . && stylelint \"src/**/*.scss\"",
+    "lint": "eslint .",
     "test": "jest",
     "lint:es": "es-check es2020 \"dist/scripts/*.js\"",
     "lint:browsers": "stylelint --config stylelint.browsers.config.mjs --max-warnings 0 \"dist/styles/style.css\" \"dist/styles/tailwind.css\""

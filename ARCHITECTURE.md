@@ -803,7 +803,7 @@ Phase 1 — the minimum to replace a WordPress blog:
 8. Manual deploy via rsync or copy
 9. WordPress importer (WXR → posts/media/users, permalink patterns, redirect stubs)
 
-Phase 2 — multi-user and theming:
+Phase 2 — multi-user and theming (complete, v0.2.0):
 
 10. User roles (admin, editor, author)
 11. Multiple collections

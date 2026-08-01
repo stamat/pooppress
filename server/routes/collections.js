@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { collections, posts } from '../queries.js'
 import { requireSlug, requireOneOf, ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
+import { requireAuth } from '../auth.js'
 
 const SORT_ORDERS = ['asc', 'desc']
 
@@ -27,10 +28,13 @@ const view = (extra = {}) => ({ page: { title: 'Collections', nav: 'collections'
 
 export function collectionRoutes() {
   const router = Router()
+  // Collections shape the whole site — editor territory (the role matrix in
+  // ARCHITECTURE.md: "editor — manage all posts and collections").
+  const editorOnly = requireAuth('editor')
 
-  router.get('/admin/collections', (req, res) => res.render('collections/list.html', view()))
+  router.get('/admin/collections', editorOnly, (req, res) => res.render('collections/list.html', view()))
 
-  router.post('/admin/collections', (req, res) => {
+  router.post('/admin/collections', editorOnly, (req, res) => {
     try {
       collections.create(fieldsFromBody(req.body))
       requestBuild('collection created')
@@ -40,7 +44,7 @@ export function collectionRoutes() {
     }
   })
 
-  router.post('/admin/collections/:id', (req, res, next) => {
+  router.post('/admin/collections/:id', editorOnly, (req, res, next) => {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return next()
     try {
@@ -52,7 +56,7 @@ export function collectionRoutes() {
     }
   })
 
-  router.post('/admin/collections/:id/delete', (req, res, next) => {
+  router.post('/admin/collections/:id/delete', editorOnly, (req, res, next) => {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return next()
     // Reassigning posts is the author's decision, not a cascade we make for them.
@@ -64,15 +68,15 @@ export function collectionRoutes() {
     res.redirect('/admin/collections')
   })
 
-  router.get('/api/collections', (req, res) => res.json(collections.withCounts()))
+  router.get('/api/collections', editorOnly, (req, res) => res.json(collections.withCounts()))
 
-  router.post('/api/collections', (req, res) => {
+  router.post('/api/collections', editorOnly, (req, res) => {
     const collection = collections.create(fieldsFromBody(req.body))
     requestBuild('collection created')
     res.status(201).json(collection)
   })
 
-  router.put('/api/collections/:id', (req, res) => {
+  router.put('/api/collections/:id', editorOnly, (req, res) => {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return res.status(404).json({ error: 'not found' })
     const updated = collections.update(collection.id, fieldsFromBody(req.body))
@@ -80,7 +84,7 @@ export function collectionRoutes() {
     res.json(updated)
   })
 
-  router.delete('/api/collections/:id', (req, res) => {
+  router.delete('/api/collections/:id', editorOnly, (req, res) => {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return res.status(404).json({ error: 'not found' })
     if (posts.list({ collection_id: collection.id, limit: 1 }).total > 0) {

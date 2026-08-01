@@ -14,6 +14,10 @@
     <h1>{% if post.id %}Edit post{% else %}New post{% endif %}</h1>
     <div class="flex items-center gap-2">
       <span class="text-xs text-slate-500" x-show="dirty">unsaved changes</span>
+      {% if post.id %}
+        {# Previews build the saved version — the button opens it in a new tab. #}
+        <button class="btn" type="submit" formaction="/admin/posts/{{ post.id }}/preview" formtarget="_blank">Preview</button>
+      {% endif %}
       <button class="btn btn-primary" type="submit">Save</button>
     </div>
   </div>
@@ -56,15 +60,19 @@
             <option value="{{ status }}" {% if post.status == status %}selected{% endif %}>{{ status }}</option>
           {% endfor %}
         </select>
-        <label class="label" for="published_at">Publish date</label>
-        <input class="input mb-3" id="published_at" type="datetime-local" name="published_at"
-               value="{{ post.published_at | date('input') }}" @change="dirty = true">
+        {% if canPublish %}
+          <label class="label" for="published_at">Publish date</label>
+          <input class="input mb-3" id="published_at" type="datetime-local" name="published_at"
+                 value="{{ post.published_at | date('input') }}" @change="dirty = true">
+        {% endif %}
         {% if post.id %}
           <div class="flex gap-2">
-            {% if post.status == 'published' %}
-              <button class="btn" type="submit" formaction="/admin/posts/{{ post.id }}/unpublish">Unpublish</button>
-            {% else %}
-              <button class="btn btn-primary" type="submit" formaction="/admin/posts/{{ post.id }}/publish">Publish</button>
+            {% if canPublish %}
+              {% if post.status == 'published' %}
+                <button class="btn" type="submit" formaction="/admin/posts/{{ post.id }}/unpublish">Unpublish</button>
+              {% else %}
+                <button class="btn btn-primary" type="submit" formaction="/admin/posts/{{ post.id }}/publish">Publish</button>
+              {% endif %}
             {% endif %}
             {# Alpine, not an inline handler: the admin CSP has no
                script-src 'unsafe-inline', so onclick="" never runs. #}

@@ -36,9 +36,12 @@ email still pays for a hash so response timing can't enumerate users. Ten failur
 off cross-site writes, and a state-changing request whose `Origin` disagrees with the
 site's is refused. Corollary, enforced in review: GET handlers never mutate.
 
-**XSS.** Nunjucks autoescaping is on for every admin template. The admin sends
-`Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
-`Referrer-Policy: same-origin`.
+**XSS.** Nunjucks autoescaping is on for every admin template. Raw HTML in markdown is an
+editor/admin capability — content written by author-role accounts has its HTML escaped at
+build time and in the editor preview, so an author can never plant a script that runs in
+an admin's browser or on the public site (WordPress's `unfiltered_html` line). The admin
+sends `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options:
+nosniff` and `Referrer-Policy: same-origin`.
 
 **Uploads.** Allowlisted formats only (JPEG, PNG, GIF, WebP, AVIF), verified by parsing
 the file rather than trusting its name; stored under generated names; size-capped. No SVG.

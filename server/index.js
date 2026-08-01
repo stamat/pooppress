@@ -1,7 +1,7 @@
 import express from 'express'
 import nunjucks from 'nunjucks'
 import path from 'node:path'
-import { ADMIN_DIST, ADMIN_VIEWS, UPLOADS_DIR, PORT } from './config.js'
+import { ADMIN_DIST, ADMIN_VIEWS, UPLOADS_DIR, PREVIEWS_DIR, PORT } from './config.js'
 import { sessionMiddleware, originCheck, requireAuth } from './auth.js'
 import { authRoutes } from './routes/auth.js'
 import { postRoutes } from './routes/posts.js'
@@ -12,6 +12,7 @@ import { settingsRoutes } from './routes/settings.js'
 import { userRoutes } from './routes/users.js'
 import { ValidationError } from './validate.js'
 import { posts, media, collections, settings } from './queries.js'
+import { startScheduler } from './build/scheduler.js'
 
 // Admin templates are rendered per request (htmx swaps need live data), so
 // nunjucks runs here rather than in the admin's poops build. poops only
@@ -69,6 +70,9 @@ export function createApp() {
 
   app.use('/admin/assets', express.static(ADMIN_DIST, { fallthrough: true }))
   app.use('/uploads', express.static(UPLOADS_DIR, { setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff') }))
+  // Draft previews: the 32-hex token in the path is the whole authorization —
+  // unguessable, shareable with a reviewer, and dead after the next build.
+  app.use('/preview', express.static(PREVIEWS_DIR, { setHeaders: (res) => res.setHeader('X-Robots-Tag', 'noindex') }))
 
   app.use(sessionMiddleware)
   app.use(originCheck)
@@ -119,5 +123,6 @@ export function createApp() {
 }
 
 export function start(port = PORT) {
+  startScheduler()
   return createApp().listen(port, () => console.log(`pooppress → http://localhost:${port}/admin`))
 }

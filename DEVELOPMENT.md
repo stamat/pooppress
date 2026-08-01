@@ -173,17 +173,17 @@ The Phase 1 exit criterion, built instead of implied:
 
 ---
 
-## Phase 2 — multi-user and theming
+## Phase 2 — multi-user and theming (complete)
 
-Order matters less here; each is independent.
+Each item was independent; all shipped. Checks live in `scripts/checks/`.
 
-- **Roles** — enforce admin/editor/author matrix in `requireAuth(role)`; author sees only own posts; review status becomes meaningful; author-role content renders markdown with `html: false` — raw HTML is an editor/admin capability (WP's `unfiltered_html` line; blocks author→admin stored XSS)
-- **Collections UI** — CRUD pages; bridge already handles multiple collections, this is admin-only work
-- **Theme config UI** — render `configSchema` types (color/number/boolean/select) as a settings form; values into `theme.config` setting
-- **Scheduled publishing** — the build already exports only `published_at <= now` (M5), so this is a 60s `setInterval` that calls `requestBuild()` when a scheduled post has come due since the last build. No cron dependency, no status flip
-- **Draft preview** — build single draft to `data/previews/<token>/` (crypto-random token), served by Express at `/preview/<token>/` — never written into `output/`, so a deploy can't ship drafts; expires by deleting the dir on next build
+- **Roles** — the admin/editor/author matrix is enforced in the routes (`canPublish` in `auth.js`): authors see and touch only their own posts, save only `draft`/`review`, and a published post is read-only to its author; publish/unpublish, collections, media deletion and manual rebuilds are editor+. Author-role raw HTML is escaped at build export (`server/build/sanitize.js` — poops renders markdown with marked, which has no per-file `html: false`, so the neutralizing happens before the markup dir is written); the editor's client-side preview applies the same strip for everyone. Check: `p2-roles.test.mjs`
+- **Collections UI** — CRUD pages (landed with M-era admin work). Check: `admin-screens.test.mjs`
+- **Theme config UI** — `configSchema` types (color/number/boolean/select/text) render as a form; values land in the `theme.config` setting with real types. Check: `admin-screens.test.mjs`
+- **Scheduled publishing** — a 60s sweep (`server/build/scheduler.js`) calls `requestBuild()` when a scheduled post has come due since the last sweep. No cron dependency, no status flip. Check: `p2-scheduling.test.mjs`
+- **Draft preview** — one draft builds with the real theme into `data/previews/<32-hex-token>/`, served at `/preview/<token>/` — never written into `output/`, so a deploy can't ship drafts; every site build deletes the previews dir, expiring all tokens. Check: `p2-preview.test.mjs`
 
-**Phase 2 exit:** three-author blog with a custom-configured theme. Tag v0.2.0.
+**Phase 2 exit met:** three-author blog with a custom-configured theme. Tag v0.2.0.
 
 ---
 

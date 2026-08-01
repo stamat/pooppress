@@ -14,6 +14,9 @@ export const DATA_DIR = path.resolve(process.env.POOPPRESS_DATA || path.join(SIT
 export const UPLOADS_DIR = path.join(DATA_DIR, 'uploads')
 export const DB_PATH = path.join(DATA_DIR, 'pooppress.db')
 export const OUTPUT_DIR = path.resolve(process.env.POOPPRESS_OUTPUT || path.join(SITE_ROOT, 'output'))
+// Draft previews build here — under data/, never under output/, so a deploy
+// can't ship a draft.
+export const PREVIEWS_DIR = path.join(DATA_DIR, 'previews')
 
 export const ADMIN_DIST = path.join(PKG_ROOT, 'admin', 'dist')
 export const ADMIN_VIEWS = path.join(PKG_ROOT, 'admin', 'src', 'markup')

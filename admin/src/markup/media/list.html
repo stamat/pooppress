@@ -1,12 +1,26 @@
 {% extends "admin.html" %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between">
-  <h1>Media</h1>
-  <form method="post" action="/admin/media/upload" enctype="multipart/form-data" class="flex items-center gap-2">
-    <input class="input w-auto" type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" required>
+<h1 class="mb-4">Media</h1>
+{# Drag-and-drop is an enhancement — the plain file input + button keeps working without JS. #}
+<form method="post" action="/admin/media/upload" enctype="multipart/form-data"
+      x-data="{ over: false }"
+      @dragover.prevent="over = true" @dragleave.prevent="over = false"
+      @drop.prevent="over = false; $refs.file.files = $event.dataTransfer.files; $el.requestSubmit()"
+      class="dropzone mb-4 flex flex-wrap items-center justify-between gap-3"
+      :class="over && 'dropzone-active'">
+  <div class="flex items-center gap-3">
+    <svg class="h-6 w-6 text-slate-400" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/>
+    </svg>
+    <div>
+      <div class="font-medium text-slate-700">Drop images here to upload</div>
+      <div class="text-xs text-slate-500">JPEG, PNG, GIF, WebP and AVIF. SVG is not accepted — it can carry scripts.</div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <input class="input w-auto" type="file" name="file" x-ref="file" accept="image/jpeg,image/png,image/gif,image/webp,image/avif" required>
     <button class="btn btn-primary" type="submit">Upload</button>
-  </form>
-</div>
-<p class="mb-3 text-xs text-slate-500">JPEG, PNG, GIF, WebP and AVIF. SVG is not accepted — it can carry scripts.</p>
+  </div>
+</form>
 {% include "media/_grid.html" %}
 {% endblock %}

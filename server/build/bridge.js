@@ -4,7 +4,9 @@ import { promisify } from 'node:util'
 import path from 'node:path'
 import yaml from 'js-yaml'
 import { posts, collections, settings } from '../queries.js'
-import { SITE_ROOT, OUTPUT_DIR, UPLOADS_DIR, themeDir } from '../config.js'
+import { SITE_ROOT, OUTPUT_DIR, UPLOADS_DIR, PREVIEWS_DIR, themeDir } from '../config.js'
+import { randomBytes } from 'node:crypto'
+import { stripRawHtml } from './sanitize.js'
 
 const run = promisify(execFile)
 
@@ -21,27 +23,57 @@ const POOPS_BIN = new URL(await import.meta.resolve('poops/poops.js')).pathname
 export async function buildSite() {
   rmSync(BUILD_DIR, { recursive: true, force: true })
   rmSync(OUTPUT_TMP, { recursive: true, force: true })
+  // Previews expire here: every site build clears them, so a stale token 404s.
+  rmSync(PREVIEWS_DIR, { recursive: true, force: true })
   mkdirSync(MARKUP_DIR, { recursive: true })
 
   const site = siteData()
   const theme = loadTheme()
   const published = posts.published()
 
-  exportTheme(theme)
-  exportPosts(published)
-  exportCollections(published)
-  exportThemeConfig(theme)
-
-  writeFileSync(path.join(BUILD_DIR, 'poops.json'), JSON.stringify(poopsConfig({ site, theme }), null, 2))
+  exportInto({ buildDir: BUILD_DIR, markupDir: MARKUP_DIR, outDir: OUTPUT_TMP, site, theme, items: published })
 
   const { stdout, stderr } = await run(process.execPath, [POOPS_BIN, '--build', '-q', '-c', 'poops.json'], { cwd: BUILD_DIR })
     .catch((err) => { throw new Error(`poops build failed:\n${err.stderr || err.stdout || err.message}`) })
   if (process.env.POOPPRESS_VERBOSE) console.log(stdout || stderr)
 
-  writeRedirectStubs(published, site)
+  writeRedirectStubs(published, site, OUTPUT_TMP)
   swapOutput()
   rmSync(BUILD_DIR, { recursive: true, force: true })
   return { posts: published.length }
+}
+
+// One draft, built as if published, into data/previews/<token>/ — a capability
+// URL: unguessable, shareable with a reviewer, gone on the next site build.
+export async function buildPreview(postId) {
+  const post = posts.forPreview(postId)
+  if (!post) return null
+  const token = randomBytes(16).toString('hex')
+  const buildDir = path.join(PREVIEWS_DIR, `.build-${token}`)
+  const markupDir = path.join(buildDir, 'markup')
+  const outDir = path.join(PREVIEWS_DIR, token)
+  mkdirSync(markupDir, { recursive: true })
+
+  const site = siteData()
+  const theme = loadTheme()
+  // The draft rides along with the published site, so its collection index
+  // and navigation look exactly as they would after publishing.
+  const items = [...posts.published().filter((p) => p.id !== post.id), post]
+
+  exportInto({ buildDir, markupDir, outDir, site, theme, items })
+
+  await run(process.execPath, [POOPS_BIN, '--build', '-q', '-c', 'poops.json'], { cwd: buildDir })
+    .catch((err) => { throw new Error(`preview build failed:\n${err.stderr || err.stdout || err.message}`) })
+  rmSync(buildDir, { recursive: true, force: true })
+  return { token, page: itemPath(post).replace(/\.md$/, '.html').split(path.sep).join('/') }
+}
+
+function exportInto({ buildDir, markupDir, outDir, site, theme, items }) {
+  exportTheme(theme, { buildDir, markupDir })
+  exportPosts(items, markupDir)
+  exportCollections(items, markupDir)
+  exportThemeConfig(theme, markupDir)
+  writeFileSync(path.join(buildDir, 'poops.json'), JSON.stringify(poopsConfig({ site, theme, buildDir, outDir }), null, 2))
 }
 
 function siteData() {
@@ -64,25 +96,25 @@ function loadTheme() {
 
 // Layouts and partials go to underscore dirs — poops skips those for output but
 // the engine resolves includes from them (includePaths below).
-function exportTheme({ dir, manifest }) {
+function exportTheme({ dir, manifest }, { buildDir, markupDir }) {
   const copyInto = (from, to) => { if (existsSync(from)) cpSync(from, to, { recursive: true }) }
-  copyInto(path.join(dir, manifest.layouts || 'layouts'), path.join(MARKUP_DIR, '_layouts'))
-  copyInto(path.join(dir, manifest.partials || 'partials'), path.join(MARKUP_DIR, '_partials'))
-  copyInto(path.join(dir, 'styles'), path.join(BUILD_DIR, 'theme', 'styles'))
-  copyInto(path.join(dir, 'scripts'), path.join(BUILD_DIR, 'theme', 'scripts'))
-  copyInto(path.join(dir, 'static'), path.join(BUILD_DIR, 'theme', 'static'))
+  copyInto(path.join(dir, manifest.layouts || 'layouts'), path.join(markupDir, '_layouts'))
+  copyInto(path.join(dir, manifest.partials || 'partials'), path.join(markupDir, '_partials'))
+  copyInto(path.join(dir, 'styles'), path.join(buildDir, 'theme', 'styles'))
+  copyInto(path.join(dir, 'scripts'), path.join(buildDir, 'theme', 'scripts'))
+  copyInto(path.join(dir, 'static'), path.join(buildDir, 'theme', 'static'))
 }
 
 // theme.json's `config` values reach templates as {{ theme.* }} — poops names a
 // data file's variable after its basename.
-function exportThemeConfig({ manifest }) {
+function exportThemeConfig({ manifest }, markupDir) {
   const config = { ...(manifest.config || {}), ...(settings.get('theme.config') || {}) }
-  const dir = path.join(MARKUP_DIR, '_data')
+  const dir = path.join(markupDir, '_data')
   mkdirSync(dir, { recursive: true })
   writeFileSync(path.join(dir, 'theme.yaml'), yaml.dump(config))
 }
 
-function exportPosts(published) {
+function exportPosts(published, markupDir) {
   for (const post of published) {
     const frontMatter = {
       layout: post.meta.layout || post.collection_layout || (post.collection_slug ? 'post' : 'page'),
@@ -94,9 +126,11 @@ function exportPosts(published) {
       excerpt: post.excerpt || undefined,
       ...post.meta
     }
-    const file = path.join(MARKUP_DIR, itemPath(post))
+    const file = path.join(markupDir, itemPath(post))
     mkdirSync(path.dirname(file), { recursive: true })
-    writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n\n${post.body_markdown}\n`)
+    // Author-role content ships without raw HTML (ARCHITECTURE §Security).
+    const body = post.author_role === 'author' ? stripRawHtml(post.body_markdown) : post.body_markdown
+    writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n\n${body}\n`)
   }
 }
 
@@ -131,9 +165,9 @@ function itemPath(post) {
 // name ("dev-notes") is unreachable in a nunjucks expression; and the sort
 // order lives in the collections row, which poops can't see. The item list
 // travels as front matter, so a theme only reads page.pageItems.
-function exportCollections(published) {
+function exportCollections(published, markupDir) {
   for (const collection of collections.all()) {
-    const dir = path.join(MARKUP_DIR, collection.slug)
+    const dir = path.join(markupDir, collection.slug)
     mkdirSync(dir, { recursive: true })
 
     const items = published
@@ -191,13 +225,13 @@ function autoExcerpt(markdown) {
     .slice(0, 200)
 }
 
-function poopsConfig({ site, theme }) {
+function poopsConfig({ site, theme, buildDir, outDir }) {
   const styles = theme.manifest.styles
   const scripts = theme.manifest.scripts
   const config = {
     markup: {
       in: 'markup',
-      out: OUTPUT_TMP,
+      out: outDir,
       options: {
         site,
         data: ['_data/theme.yaml'],
@@ -212,26 +246,26 @@ function poopsConfig({ site, theme }) {
   if (styles?.in) {
     config.styles = [{
       in: path.posix.join('theme', styles.in),
-      out: path.join(OUTPUT_TMP, styles.out || 'css'),
+      out: path.join(outDir, styles.out || 'css'),
       options: { minify: true }
     }]
   }
   if (scripts?.in) {
     config.scripts = [{
       in: path.posix.join('theme', scripts.in),
-      out: path.join(OUTPUT_TMP, scripts.out || 'js'),
+      out: path.join(outDir, scripts.out || 'js'),
       options: { minify: true, format: 'iife' }
     }]
   }
-  if (existsSync(UPLOADS_DIR)) config.copy.push({ in: UPLOADS_DIR, out: OUTPUT_TMP })
-  if (existsSync(path.join(BUILD_DIR, 'theme', 'static'))) config.copy.push({ in: 'theme/static', out: OUTPUT_TMP })
+  if (existsSync(UPLOADS_DIR)) config.copy.push({ in: UPLOADS_DIR, out: outDir })
+  if (existsSync(path.join(buildDir, 'theme', 'static'))) config.copy.push({ in: 'theme/static', out: outDir })
   if (!config.copy.length) delete config.copy
   return config
 }
 
 // meta.redirect_from: old URLs that must keep resolving after a migration.
 // A meta-refresh plus a canonical link is the whole story on a static host.
-function writeRedirectStubs(published, site) {
+function writeRedirectStubs(published, site, outDir) {
   for (const post of published) {
     const from = [].concat(post.meta.redirect_from || [])
     if (!from.length) continue
@@ -239,7 +273,7 @@ function writeRedirectStubs(published, site) {
     for (const oldUrl of from) {
       const clean = String(oldUrl).replace(/^https?:\/\/[^/]+/, '').replace(/^\/+|\/+$/g, '')
       if (!clean || clean.includes('..')) continue
-      const dir = path.join(OUTPUT_TMP, clean)
+      const dir = path.join(outDir, clean)
       mkdirSync(dir, { recursive: true })
       writeFileSync(path.join(dir, 'index.html'), `<!DOCTYPE html>
 <html><head>
