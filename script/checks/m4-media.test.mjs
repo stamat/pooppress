@@ -2,7 +2,7 @@
 // row, the gallery serves it back, and an .svg or .html upload is rejected.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
 import { tempDataDir, startApp } from './helpers.mjs'
@@ -76,6 +76,20 @@ test('the picker partial lists media as insertable markdown paths', async () => 
   const html = await res.text()
   assert.ok(!html.includes('<!DOCTYPE html>'))
   assert.ok(html.includes('/uploads/'))
+})
+
+test('regenerate rebuilds missing variants and updates the row', async () => {
+  const row = q.media.list().rows[0]
+  for (const v of row.variants) unlinkSync(path.join(data.dir, v.path))
+
+  const res = await app.form('/admin/media/regenerate', {})
+  assert.equal(res.status, 302)
+
+  const after = q.media.get(row.id)
+  assert.ok(after.variants.length > 0, 'regenerate produced no variants')
+  for (const v of after.variants) {
+    assert.ok(existsSync(path.join(data.dir, v.path)), `missing regenerated variant ${v.path}`)
+  }
 })
 
 test('deleting media removes the row, the original and every variant', async () => {

@@ -108,3 +108,15 @@ export function deleteFiles(row) {
     if (existsSync(absolute)) unlinkSync(absolute)
   }
 }
+
+// Re-runs variant generation for an existing upload against the current
+// config — how a theme switch with different sizes reaches old media. Old
+// variant files go first: makeVariants discovers by filename convention, and a
+// stale 320w from a previous theme would otherwise survive into the new list.
+export async function regenerateVariants(row) {
+  for (const variant of row.variants || []) {
+    const absolute = resolveInUploads(variant.path)
+    if (existsSync(absolute)) unlinkSync(absolute)
+  }
+  return makeVariants(path.basename(row.path))
+}

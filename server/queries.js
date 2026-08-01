@@ -103,7 +103,9 @@ export const posts = {
     const where = []
     const params = []
     if (status) { where.push('p.status = ?'); params.push(status) }
-    if (collection_id !== undefined && collection_id !== null && collection_id !== '') {
+    // 'none' means standalone pages — the rows a collection filter can never reach.
+    if (collection_id === 'none') where.push('p.collection_id IS NULL')
+    else if (collection_id !== undefined && collection_id !== null && collection_id !== '') {
       where.push('p.collection_id = ?'); params.push(Number(collection_id))
     }
     if (author_id) { where.push('p.author_id = ?'); params.push(author_id) }
@@ -173,6 +175,7 @@ export const media = {
       .all(limit, (Math.max(1, Number(page)) - 1) * limit).map(parseMedia)
     return { rows, total, page: Math.max(1, Number(page)), pages: Math.max(1, Math.ceil(total / limit)) }
   },
+  all: () => sql('SELECT * FROM media').all().map(parseMedia),
   remove: (id) => sql('DELETE FROM media WHERE id = ?').run(id),
   count: () => sql('SELECT COUNT(*) AS n FROM media').get().n
 }

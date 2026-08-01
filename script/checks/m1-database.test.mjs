@@ -84,3 +84,11 @@ test('post list filters by status and search', () => {
   // LIKE wildcards in user input must not widen the search
   assert.equal(q.posts.list({ search: '%' }).rows.length, 0)
 })
+
+test("collection_id 'none' lists standalone pages only", () => {
+  const pages = q.posts.list({ collection_id: 'none' })
+  assert.ok(pages.total > 0)
+  assert.ok(pages.rows.every((p) => p.collection_id === null))
+  // and it must not be read as a collection id
+  assert.notEqual(pages.total, q.posts.list({}).total)
+})

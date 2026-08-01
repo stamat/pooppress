@@ -17,6 +17,7 @@
   </select>
   <select class="input w-40" name="collection_id">
     <option value="">All collections</option>
+    <option value="none" {% if query.collection_id == 'none' %}selected{% endif %}>Pages</option>
     {% for collection in collections %}
       <option value="{{ collection.id }}" {% if query.collection_id == collection.id | string %}selected{% endif %}>{{ collection.name }}</option>
     {% endfor %}

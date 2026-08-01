@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { media } from '../queries.js'
-import { storeUpload, deleteFiles } from '../media.js'
+import { storeUpload, deleteFiles, regenerateVariants } from '../media.js'
 import { ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
 import { requireAuth } from '../auth.js'
@@ -31,6 +31,22 @@ export function mediaRoutes() {
       const row = media.create(await storeUpload(req.file.buffer, req.file.originalname, req.user.id))
       if (isHtmx(req)) return res.render('media/_grid.html', { picker: false, ...media.list({}) })
       res.redirect(`/admin/media#media-${row.id}`)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // Rebuilds every upload's variants against the current theme's sizes —
+  // the catch-up path after switching to a theme that declares different ones.
+  // Synchronous on purpose: a library needs thousands of images before this
+  // outlives a request. ponytail: move onto the build scheduler if it ever does.
+  router.post('/admin/media/regenerate', editorOnly, async (req, res, next) => {
+    try {
+      for (const row of media.list({ limit: media.count() || 1 }).rows) {
+        media.setVariants(row.id, await regenerateVariants(row))
+      }
+      requestBuild('media variants regenerated')
+      res.redirect('/admin/media')
     } catch (err) {
       next(err)
     }
