@@ -117,11 +117,15 @@ test('meta.redirect_from becomes a redirect stub', async () => {
   assert.match(html, /rel="canonical"/)
 })
 
-test('ten rapid saves cause one build', async () => {
+test('ten rapid saves cause one build, and the queue reports as building', async () => {
   const before = runner.buildStats.completed
   for (let i = 0; i < 10; i++) runner.requestBuild('rapid save')
+  // The whole point of the Rebuild button: something visible happens before
+  // the debounce window elapses.
+  assert.equal(runner.buildState.state, 'building', 'a queued build must not report idle')
   await new Promise((resolve) => setTimeout(resolve, 4000))
   assert.equal(runner.buildStats.completed, before + 1)
+  assert.equal(runner.buildState.state, 'idle', runner.buildState.error || '')
 })
 
 test('unpublishing removes the page from output/', async () => {

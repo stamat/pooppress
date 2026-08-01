@@ -1,6 +1,6 @@
 import { openSync, closeSync, unlinkSync, existsSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { DATA_DIR } from '../config.js'
+import { DATA_DIR, OUTPUT_DIR } from '../config.js'
 
 const LOCK_PATH = path.join(DATA_DIR, 'build.lock')
 const DEBOUNCE_MS = 2000
@@ -8,7 +8,13 @@ const STALE_LOCK_MS = 10 * 60 * 1000
 
 // Observable so a check can assert "a day of draft edits triggers zero builds".
 export const buildStats = { requested: 0, completed: 0, failed: 0 }
-export const buildState = { state: 'idle', error: null, finished_at: null, reason: null }
+// finished_at survives a restart by reading output/ — swapOutput() renames the
+// directory into place, so its mtime *is* the last build time.
+export const buildState = { state: 'idle', error: null, finished_at: lastOutputTime(), reason: null }
+
+function lastOutputTime() {
+  try { return new Date(statSync(OUTPUT_DIR).mtimeMs).toISOString() } catch { return null }
+}
 
 let timer = null
 
@@ -17,6 +23,10 @@ let timer = null
 export function requestBuild(reason = 'change') {
   buildStats.requested++
   buildState.reason = reason
+  // Queued counts as building: without this the status endpoint answers 'idle'
+  // for the whole debounce window, so a Rebuild click looks like it did nothing.
+  buildState.state = 'building'
+  buildState.error = null
   clearTimeout(timer)
   timer = setTimeout(() => { runBuild(reason).catch(() => {}) }, DEBOUNCE_MS)
   timer.unref?.() // a pending build must not hold the process open
@@ -46,7 +56,9 @@ function releaseLock() {
 }
 
 export async function runBuild(reason = 'manual') {
-  if (buildState.state === 'building') return buildState
+  // The lock is the only concurrency guard — a state check here would refuse
+  // every debounced build now that requestBuild() marks the queue 'building',
+  // and would wedge the process forever on a stale lock.
   if (!acquireLock()) {
     buildState.state = 'building' // another worker holds it
     return buildState

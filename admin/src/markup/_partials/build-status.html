@@ -1,5 +1,8 @@
 <div class="flex items-center gap-2 text-xs" x-data="{
-  state: 'idle', error: null, timer: null,
+  state: 'idle', error: null, finished_at: null, timer: null,
+  get builtAt () {
+    return this.finished_at ? new Date(this.finished_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : ''
+  },
   async poll () {
     try {
       const res = await fetch('/api/build/status')
@@ -7,6 +10,7 @@
       const data = await res.json()
       this.state = data.state
       this.error = data.error
+      this.finished_at = data.finished_at
     } catch (e) { /* server restarting — next tick retries */ }
     clearTimeout(this.timer)
     this.timer = setTimeout(() => this.poll(), this.state === 'building' ? 2000 : 15000)
@@ -16,6 +20,7 @@
   <span class="badge"
     :class="{ 'bg-slate-200 text-slate-700': state === 'idle', 'bg-sky-100 text-sky-800': state === 'building', 'bg-red-100 text-red-800': state === 'error' }"
     x-text="state === 'building' ? 'building…' : (state === 'error' ? 'build failed' : 'built')"></span>
+  <span class="text-slate-500" x-show="state !== 'building' && finished_at" x-text="builtAt"></span>
   {% if user.role != 'author' %}
     <button class="btn px-2 py-0.5" @click="rebuild()" :disabled="state === 'building'">Rebuild</button>
   {% endif %}
