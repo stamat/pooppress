@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Start the admin server detached, so a terminal can be closed without it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+PID_FILE=data/server.pid
+LOG_FILE=data/server.log
+
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+  echo "already running (pid $(cat "$PID_FILE"))"
+  exit 0
+fi
+
+mkdir -p data
+node bin/pooppress.js start >"$LOG_FILE" 2>&1 &
+echo $! >"$PID_FILE"
+
+echo "pooppress → http://localhost:${PORT:-3000}/admin (pid $!, log $LOG_FILE)"

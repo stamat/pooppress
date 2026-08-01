@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+PID_FILE=data/server.pid
+
+if [ ! -f "$PID_FILE" ]; then
+  echo "not running"
+  exit 0
+fi
+
+PID=$(cat "$PID_FILE")
+rm -f "$PID_FILE"
+
+if ! kill "$PID" 2>/dev/null; then
+  echo "not running (stale pid $PID)"
+  exit 0
+fi
+
+# SIGTERM first; the build child and SQLite WAL want an orderly close.
+for _ in $(seq 20); do
+  kill -0 "$PID" 2>/dev/null || { echo "stopped $PID"; exit 0; }
+  sleep 0.25
+done
+
+kill -9 "$PID" 2>/dev/null || true
+echo "killed $PID (did not exit on SIGTERM)"
