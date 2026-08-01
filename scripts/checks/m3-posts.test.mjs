@@ -90,6 +90,24 @@ test('meta key/value rows become the meta JSON column', async () => {
   assert.deepEqual(post.meta.tags, ['a', 'b'], 'JSON-looking values are stored as JSON')
 })
 
+test('the featured_image field merges into meta and clears when emptied', async () => {
+  const collection = q.collections.bySlug('blog')
+  const created = await app.form('/admin/posts', {
+    title: 'With featured', slug: 'with-featured', collection_id: String(collection.id), body_markdown: '',
+    featured_image: '/uploads/hero.jpg', meta_key: ['tags'], meta_value: ['["x"]']
+  })
+  const id = Number(created.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
+  assert.equal(q.posts.get(id).meta.featured_image, '/uploads/hero.jpg')
+  assert.deepEqual(q.posts.get(id).meta.tags, ['x'], 'meta rows survive alongside the featured field')
+
+  await app.form(`/admin/posts/${id}`, {
+    title: 'With featured', slug: 'with-featured', collection_id: String(collection.id), body_markdown: '',
+    featured_image: '', meta_key: ['tags'], meta_value: ['["x"]']
+  })
+  assert.equal(q.posts.get(id).meta.featured_image, undefined, 'an emptied field removes the key')
+  assert.deepEqual(q.posts.get(id).meta.tags, ['x'])
+})
+
 test('drafts and autosaves trigger zero builds; publishing triggers one', async () => {
   const collection = q.collections.bySlug('blog')
   const before = builds.requested

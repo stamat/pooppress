@@ -41,6 +41,9 @@ Alpine.data('postEditor', (initial = {}) => ({
   slugTouched: Boolean(initial.slug),
   dirty: false,
   editor: null,
+  // One media picker modal serves two consumers; this decides where a pick lands.
+  mediaTarget: 'body',
+  featured: initial.featured || '',
 
   init () {
     this.editor = new EasyMDE({
@@ -53,7 +56,7 @@ Alpine.data('postEditor', (initial = {}) => ({
         name: 'media',
         title: 'Insert media',
         text: '🖼',
-        action: () => this.$dispatch('open-media')
+        action: () => { this.mediaTarget = 'body'; this.$dispatch('open-media') }
       }, '|', 'preview', 'side-by-side', 'fullscreen']
     })
     // The textarea stays authoritative — the form posts it, not CodeMirror's DOM.
@@ -72,6 +75,20 @@ Alpine.data('postEditor', (initial = {}) => ({
     this.editor.codemirror.replaceSelection(`![${alt || ''}](${path})`)
     this.$refs.body.value = this.editor.value()
     this.dirty = true
+  },
+
+  pickFeatured () {
+    this.mediaTarget = 'featured'
+    this.$dispatch('open-media')
+  },
+
+  mediaPicked (path, alt) {
+    if (this.mediaTarget === 'featured') {
+      this.featured = path
+      this.dirty = true
+    } else {
+      this.insertMedia(path, alt)
+    }
   }
 }))
 
@@ -87,9 +104,10 @@ Alpine.data('menuRows', (initial = []) => ({
   }
 }))
 
-// Key/value rows for the post's meta JSON column.
+// Key/value rows for the post's meta JSON column. featured_image lives in the
+// same column but has its own sidebar control, so it never shows as a row.
 Alpine.data('metaRows', (initial = {}) => ({
-  rows: Object.entries(initial || {}).map(([key, value]) => ({
+  rows: Object.entries(initial || {}).filter(([key]) => key !== 'featured_image').map(([key, value]) => ({
     key,
     value: typeof value === 'string' ? value : JSON.stringify(value)
   })),

@@ -48,6 +48,16 @@ function fieldsFromBody(rawBody, { partial = false } = {}) {
   if (body.meta !== undefined) fields.meta = body.meta
   else if (body.meta_key !== undefined) fields.meta = metaFromForm(body)
 
+  // The edit form's featured-image control posts outside the meta rows but the
+  // value lives in the meta column (same key the WXR import writes).
+  if (body.featured_image !== undefined) {
+    const meta = { ...(fields.meta || {}) }
+    const src = String(body.featured_image).trim()
+    if (src) meta.featured_image = src
+    else delete meta.featured_image
+    fields.meta = meta
+  }
+
   if (!partial) {
     if (fields.slug === undefined) fields.slug = requireSlug(body.slug)
     fields.title = fields.title ?? ''

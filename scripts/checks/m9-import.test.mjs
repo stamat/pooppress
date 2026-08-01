@@ -170,7 +170,8 @@ test('the imported site builds and every old URL resolves', async () => {
   assert.match(readFileSync(stub, 'utf8'), /https:\/\/new\.example\/blog\/hello-wordpress\.html/)
 
   const page = readFileSync(path.join(outputDir, 'blog', 'hello-wordpress.html'), 'utf8')
-  assert.match(page, /<img[^>]+src="\/uploads\//, 'the migrated image is not referenced in the built page')
+  assert.match(page, /<img[^>]+src="\.\.\/uploads\//, 'the migrated image is not referenced relative in the built page')
+  assert.match(page, /srcset="\.\.\/uploads\//, 'srcset URLs should be page-relative too')
 })
 
 test('rerunning the import does not duplicate content', async () => {

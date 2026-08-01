@@ -4,9 +4,9 @@
       {# No `| safe` here: dump emits real quotes, and autoescaping them to
          &quot; is what keeps a title with a quote inside this attribute
          instead of breaking out of it. #}
-      x-data="postEditor({ title: {{ post.title | dump }}, slug: {{ post.slug | dump }} })"
+      x-data="postEditor({ title: {{ post.title | dump }}, slug: {{ post.slug | dump }}, featured: {{ (post.meta.featured_image or post.featured_image or '') | dump }} })"
       @open-media.window="$refs.media.dispatchEvent(new CustomEvent('show'))"
-      @media-picked.window="insertMedia($event.detail.path, $event.detail.alt)">
+      @media-picked.window="mediaPicked($event.detail.path, $event.detail.alt)">
 
   {% if error %}<div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-red-800">{{ error }}</div>{% endif %}
 
@@ -80,6 +80,18 @@
                     @click="if (!confirm('Delete this post?')) $event.preventDefault()">Delete</button>
           </div>
         {% endif %}
+      </div>
+
+      <div class="card p-3">
+        <h2 class="mb-2">Featured image</h2>
+        <input type="hidden" name="featured_image" :value="featured">
+        <template x-if="featured">
+          <img class="mb-2 w-full rounded border border-slate-200" :src="featured" alt="Featured image">
+        </template>
+        <div class="flex gap-2">
+          <button class="btn" type="button" @click="pickFeatured()" x-text="featured ? 'Change' : 'Choose'"></button>
+          <button class="btn btn-danger" type="button" x-show="featured" @click="featured = ''; dirty = true">Remove</button>
+        </div>
       </div>
 
       <div class="card p-3">

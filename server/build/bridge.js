@@ -123,6 +123,21 @@ function exportMenu(markupDir) {
   writeFileSync(path.join(dir, 'menu.yaml'), yaml.dump(settings.get('menu') || []))
 }
 
+// Body content stores uploads root-relative (/uploads/x.jpg — what the admin
+// media picker inserts and what the admin's own /uploads route serves). The
+// built site is relative-path based (relativePathPrefix everywhere), so at
+// export the page's depth is known and the same prefix is applied here.
+// ponytail: covers markdown ](...) and double-quoted src/href attrs; reference
+// -style markdown links get a pass until someone writes one.
+function relativizeUploads(body, itemFile) {
+  const depth = itemFile.split(path.sep).length - 1
+  const prefix = '../'.repeat(depth) || './'
+  return body
+    .replace(/(\]\(|src="|href=")\/uploads\//g, `$1${prefix}uploads/`)
+    // srcset holds comma-separated candidates, each with its own URL
+    .replace(/srcset="([^"]*)"/g, (m, val) => `srcset="${val.replace(/(^|,\s*)\/uploads\//g, `$1${prefix}uploads/`)}"`)
+}
+
 function exportPosts(published, markupDir) {
   for (const post of published) {
     const frontMatter = {
@@ -135,11 +150,12 @@ function exportPosts(published, markupDir) {
       excerpt: post.excerpt || undefined,
       ...post.meta
     }
-    const file = path.join(markupDir, itemPath(post))
+    const itemFile = itemPath(post)
+    const file = path.join(markupDir, itemFile)
     mkdirSync(path.dirname(file), { recursive: true })
     // Author-role content ships without raw HTML (ARCHITECTURE §Security).
     const body = post.author_role === 'author' ? stripRawHtml(post.body_markdown) : post.body_markdown
-    writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n\n${body}\n`)
+    writeFileSync(file, `---\n${yaml.dump(frontMatter)}---\n\n${relativizeUploads(body, itemFile)}\n`)
   }
 }
 
