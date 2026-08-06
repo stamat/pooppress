@@ -2,10 +2,16 @@ import { Router } from 'express'
 import { users, sessions } from '../queries.js'
 import { hashPassword, requireAuth } from '../auth.js'
 import { requireOneOf, ValidationError } from '../validate.js'
+import { store } from '../db.js'
 
 const ROLES = ['admin', 'editor', 'author']
 
-const view = (extra = {}) => ({ page: { title: 'Users', nav: 'users' }, rows: users.all(), roles: ROLES, ...extra })
+// Store reads are shaped to declared fields, so the rows reaching the template
+// carry no password_hash. ponytail: the 10k limit outlives any admin screen —
+// paginate the day a site has that many accounts.
+const allUsers = (req) => store.users.list({ user: req.user, sort: 'display_name', order: 'asc', limit: 10000 })
+
+const view = (req, extra = {}) => ({ page: { title: 'Users', nav: 'users' }, rows: allUsers(req), roles: ROLES, ...extra })
 
 function validEmail(value) {
   const email = String(value || '').trim().toLowerCase()
@@ -23,7 +29,7 @@ export function userRoutes() {
   const router = Router()
   const adminOnly = requireAuth('admin')
 
-  router.get('/admin/users', adminOnly, (req, res) => res.render('users/list.html', view()))
+  router.get('/admin/users', adminOnly, (req, res) => res.render('users/list.html', view(req)))
 
   router.post('/admin/users', adminOnly, (req, res) => {
     try {
@@ -35,13 +41,12 @@ export function userRoutes() {
       })
       res.redirect('/admin/users')
     } catch (err) {
-      res.status(422).render('users/list.html', view({ error: message(err), form: req.body }))
+      res.status(422).render('users/list.html', view(req, { error: message(err), form: req.body }))
     }
   })
 
-  router.post('/admin/users/:id', adminOnly, (req, res, next) => {
-    const user = users.get(Number(req.params.id))
-    if (!user) return next()
+  router.post('/admin/users/:id', adminOnly, (req, res) => {
+    const user = store.users.get(Number(req.params.id), { user: req.user })
     try {
       if (req.body.email || req.body.role || req.body.display_name) {
         users.update(user.id, {
@@ -58,21 +63,20 @@ export function userRoutes() {
       }
       res.redirect('/admin/users')
     } catch (err) {
-      res.status(422).render('users/list.html', view({ error: message(err), form: req.body }))
+      res.status(422).render('users/list.html', view(req, { error: message(err), form: req.body }))
     }
   })
 
-  router.post('/admin/users/:id/delete', adminOnly, (req, res, next) => {
-    const user = users.get(Number(req.params.id))
-    if (!user) return next()
-    if (user.role === 'admin' && users.all().filter((u) => u.role === 'admin').length === 1) {
-      return res.status(422).render('users/list.html', view({ error: 'That is the last admin — promote someone else first.' }))
+  router.post('/admin/users/:id/delete', adminOnly, (req, res) => {
+    const user = store.users.get(Number(req.params.id), { user: req.user })
+    if (user.role === 'admin' && store.users.count({ user: req.user, where: { role: 'admin' } }) === 1) {
+      return res.status(422).render('users/list.html', view(req, { error: 'That is the last admin — promote someone else first.' }))
     }
-    users.remove(user.id) // sessions cascade; posts keep their content, author goes null
+    store.users.remove(user.id, { user: req.user }) // sessions cascade; posts keep their content, author goes null
     res.redirect('/admin/users')
   })
 
-  router.get('/api/users', adminOnly, (req, res) => res.json(users.all().map(publicUser)))
+  router.get('/api/users', adminOnly, (req, res) => res.json(allUsers(req).map(publicUser)))
 
   router.post('/api/users', adminOnly, (req, res) => {
     const user = users.create({
@@ -85,8 +89,7 @@ export function userRoutes() {
   })
 
   router.put('/api/users/:id', adminOnly, (req, res) => {
-    const user = users.get(Number(req.params.id))
-    if (!user) return res.status(404).json({ error: 'not found' })
+    const user = store.users.get(Number(req.params.id), { user: req.user })
     if (req.body.password) {
       users.updatePassword(user.id, hashPassword(checkPassword(req.body.password)))
       sessions.removeForUser(user.id)
@@ -100,12 +103,11 @@ export function userRoutes() {
   })
 
   router.delete('/api/users/:id', adminOnly, (req, res) => {
-    const user = users.get(Number(req.params.id))
-    if (!user) return res.status(404).json({ error: 'not found' })
-    if (user.role === 'admin' && users.all().filter((u) => u.role === 'admin').length === 1) {
+    const user = store.users.get(Number(req.params.id), { user: req.user })
+    if (user.role === 'admin' && store.users.count({ user: req.user, where: { role: 'admin' } }) === 1) {
       return res.status(422).json({ error: 'cannot delete the last admin' })
     }
-    users.remove(user.id)
+    store.users.remove(user.id, { user: req.user })
     res.status(204).end()
   })
 

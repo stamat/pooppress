@@ -5,20 +5,21 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q
+let app, data, q, s
 
 const login = (email) => app.form('/admin/login', { email, password: 'pw' })
 
 before(async () => {
   data = tempDataDir()
   q = await import('../../server/queries.js')
+  s = await seed()
   const auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin', display_name: 'Admin' })
   q.users.create({ email: 'editor@example.com', password_hash: auth.hashPassword('pw'), role: 'editor', display_name: 'Editor' })
   q.users.create({ email: 'author@example.com', password_hash: auth.hashPassword('pw'), role: 'author', display_name: 'Author' })
-  q.collections.create({ name: 'Blog', slug: 'blog' })
+  s.collection({ name: 'Blog', slug: 'blog' })
   app = await startApp()
 })
 after(async () => {

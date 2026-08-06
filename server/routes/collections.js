@@ -1,7 +1,9 @@
 import { Router } from 'express'
+import { ConflictError } from 'septic'
 import { collections, posts } from '../queries.js'
 import { requireSlug, requireOneOf, ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
+import { store } from '../db.js'
 import { requireAuth } from '../auth.js'
 
 const SORT_ORDERS = ['asc', 'desc']
@@ -36,7 +38,7 @@ export function collectionRoutes() {
 
   router.post('/admin/collections', editorOnly, (req, res) => {
     try {
-      collections.create(fieldsFromBody(req.body))
+      store.collections.create(fieldsFromBody(req.body), { user: req.user })
       requestBuild('collection created')
       res.redirect('/admin/collections')
     } catch (err) {
@@ -63,7 +65,7 @@ export function collectionRoutes() {
     if (posts.list({ collection_id: collection.id, limit: 1 }).total > 0) {
       return res.status(422).render('collections/list.html', view({ error: 'That collection still has posts. Move them first.' }))
     }
-    collections.remove(collection.id)
+    store.collections.remove(collection.id, { user: req.user })
     requestBuild('collection deleted')
     res.redirect('/admin/collections')
   })
@@ -71,7 +73,7 @@ export function collectionRoutes() {
   router.get('/api/collections', editorOnly, (req, res) => res.json(collections.withCounts()))
 
   router.post('/api/collections', editorOnly, (req, res) => {
-    const collection = collections.create(fieldsFromBody(req.body))
+    const collection = store.collections.create(fieldsFromBody(req.body), { user: req.user })
     requestBuild('collection created')
     res.status(201).json(collection)
   })
@@ -90,7 +92,7 @@ export function collectionRoutes() {
     if (posts.list({ collection_id: collection.id, limit: 1 }).total > 0) {
       return res.status(422).json({ error: 'collection still has posts' })
     }
-    collections.remove(collection.id)
+    store.collections.remove(collection.id, { user: req.user })
     requestBuild('collection deleted')
     res.status(204).end()
   })
@@ -100,6 +102,7 @@ export function collectionRoutes() {
 
 function message(err) {
   if (err instanceof ValidationError) return err.message
-  if (String(err.code || '').startsWith('SQLITE_CONSTRAINT')) return 'That slug is already taken.'
+  // Duplicate slug: ConflictError from a store create, raw SQLite from the update path.
+  if (err instanceof ConflictError || String(err.code || '').startsWith('SQLITE_CONSTRAINT')) return 'That slug is already taken.'
   throw err
 }

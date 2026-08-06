@@ -5,9 +5,9 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q
+let app, data, q, s
 
 function writeFixtureTheme(root) {
   const dir = path.join(root, 'themes', 'fixture')
@@ -25,9 +25,10 @@ before(async () => {
   data = tempDataDir()
   writeFixtureTheme(data.dir)
   q = await import('../../server/queries.js')
+  s = await seed()
   const auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin', display_name: 'Admin' })
-  q.collections.create({ name: 'Blog', slug: 'blog' })
+  s.collection({ name: 'Blog', slug: 'blog' })
   q.settings.set('theme.active', 'fixture')
   app = await startApp()
   await app.form('/admin/login', { email: 'admin@example.com', password: 'pw' })

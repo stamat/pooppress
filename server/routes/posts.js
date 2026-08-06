@@ -1,8 +1,9 @@
 import { Router } from 'express'
+import { ConflictError } from 'septic'
 import { posts, collections } from '../queries.js'
-import { requireSlug, requireOneOf, toTimestamp, metaFromForm, termList, TAXONOMIES, ValidationError } from '../validate.js'
+import { requireSlug, requireOneOf, toTimestamp, isoUtc, metaFromForm, termList, TAXONOMIES, ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
-import { nowSql } from '../db.js'
+import { store, nowSql } from '../db.js'
 import { canPublish } from '../auth.js'
 
 const STATUSES = ['draft', 'review', 'published', 'archived']
@@ -30,6 +31,17 @@ function guardStatus (user, fields) {
 function rebuildIfPublic(post, reason) {
   if (post && post.status === 'published') requestBuild(reason)
 }
+
+// Publishing keeps an existing timestamp — by not resending it, since a store
+// round trip would shift it — and stamps a fresh ISO-Z one otherwise.
+const publishFields = (post) => post.published_at
+  ? { status: 'published' }
+  : { status: 'published', published_at: new Date().toISOString() }
+
+// What a store create takes: same fields, timestamp carrying its Z.
+const forStore = (fields) => fields.published_at
+  ? { ...fields, published_at: isoUtc(fields.published_at) }
+  : fields
 
 function fieldsFromBody(rawBody, { partial = false } = {}) {
   const body = rawBody || {} // a request with no parseable body is still a request
@@ -77,9 +89,15 @@ function fieldsFromBody(rawBody, { partial = false } = {}) {
   return fields
 }
 
-// SQLite reports a duplicate slug as a constraint failure; that is a user
-// error (422), not a 500.
+// A constraint failure is a user error (422), not a 500. It arrives as
+// septic's ConflictError from a store create — 409 for a duplicate, 422 for a
+// dangling reference — and as a raw SQLite failure from the raw update path.
 function asValidationError(err) {
+  if (err instanceof ConflictError) {
+    return err.status === 409
+      ? new ValidationError('That slug is already used in this collection.', 'slug')
+      : new ValidationError('Unknown collection.', 'collection_id')
+  }
   if (String(err.code || '').startsWith('SQLITE_CONSTRAINT')) {
     return new ValidationError('That slug is already used in this collection.', 'slug')
   }
@@ -148,9 +166,8 @@ export function postRoutes() {
 
   router.get('/admin/posts/new', (req, res) => res.render('posts/edit.html', editorView(req, null)))
 
-  router.get('/admin/posts/:id', (req, res, next) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return next()
+  router.get('/admin/posts/:id', (req, res) => {
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user) && post.author_id !== req.user.id) return deny(req, res)
     res.render('posts/edit.html', editorView(req, post))
   })
@@ -159,7 +176,7 @@ export function postRoutes() {
     try {
       const fields = fieldsFromBody(req.body)
       guardStatus(req.user, fields)
-      const post = posts.create({ ...fields, author_id: req.user.id })
+      const post = store.posts.create(forStore({ ...fields, author_id: req.user.id }), { user: req.user })
       rebuildIfPublic(post, 'post created')
       res.redirect(`/admin/posts/${post.id}`)
     } catch (err) {
@@ -169,9 +186,8 @@ export function postRoutes() {
     }
   })
 
-  router.post('/admin/posts/:id', (req, res, next) => {
-    const existing = posts.get(Number(req.params.id))
-    if (!existing) return next()
+  router.post('/admin/posts/:id', (req, res) => {
+    const existing = store.posts.get(Number(req.params.id), { user: req.user })
     if (!mayTouch(req.user, existing)) return deny(req, res)
     try {
       // Autosave carries only the body and must never change status or build.
@@ -191,27 +207,26 @@ export function postRoutes() {
     }
   })
 
-  router.post('/admin/posts/:id/publish', (req, res, next) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return next()
+  router.post('/admin/posts/:id/publish', (req, res) => {
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user)) return deny(req, res)
-    const published = posts.setStatus(post.id, 'published', post.published_at || nowSql())
+    const published = store.posts.update(post.id, publishFields(post), { user: req.user, partial: true })
     requestBuild('post published')
     res.redirect(`/admin/posts/${published.id}`)
   })
 
-  router.post('/admin/posts/:id/unpublish', (req, res, next) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return next()
+  router.post('/admin/posts/:id/unpublish', (req, res) => {
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user)) return deny(req, res)
-    posts.setStatus(post.id, 'draft', post.published_at)
+    // Only status: published_at is not resent, so the schedule survives the
+    // unpublish, as before.
+    store.posts.update(post.id, { status: 'draft' }, { user: req.user, partial: true })
     requestBuild('post unpublished')
     res.redirect(`/admin/posts/${post.id}`)
   })
 
-  router.post('/admin/posts/:id/preview', async (req, res, next) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return next()
+  router.post('/admin/posts/:id/preview', async (req, res) => {
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     // Authors preview their own work — that's how "submit for review" gets
     // eyeballs on it — but only their own.
     if (!canPublish(req.user) && post.author_id !== req.user.id) return deny(req, res)
@@ -223,11 +238,10 @@ export function postRoutes() {
     }
   })
 
-  router.post('/admin/posts/:id/delete', (req, res, next) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return next()
+  router.post('/admin/posts/:id/delete', (req, res) => {
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!mayTouch(req.user, post)) return deny(req, res)
-    posts.remove(post.id)
+    store.posts.remove(post.id, { user: req.user })
     rebuildIfPublic(post, 'post deleted')
     if (isHtmx(req)) return res.status(204).set('HX-Redirect', '/admin/posts').end()
     res.redirect('/admin/posts')
@@ -242,8 +256,7 @@ export function postRoutes() {
   })
 
   router.get('/api/posts/:id', (req, res) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return res.status(404).json({ error: 'not found' })
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user) && post.author_id !== req.user.id) return deny(req, res)
     res.json(post)
   })
@@ -252,7 +265,7 @@ export function postRoutes() {
     try {
       const fields = fieldsFromBody(req.body)
       guardStatus(req.user, fields)
-      const post = posts.create({ ...fields, author_id: req.user.id })
+      const post = store.posts.create(forStore({ ...fields, author_id: req.user.id }), { user: req.user })
       rebuildIfPublic(post, 'post created')
       res.status(201).json(post)
     } catch (err) {
@@ -261,8 +274,7 @@ export function postRoutes() {
   })
 
   router.put('/api/posts/:id', (req, res) => {
-    const existing = posts.get(Number(req.params.id))
-    if (!existing) return res.status(404).json({ error: 'not found' })
+    const existing = store.posts.get(Number(req.params.id), { user: req.user })
     if (!mayTouch(req.user, existing)) return deny(req, res)
     try {
       const fields = fieldsFromBody(req.body, { partial: true })
@@ -276,28 +288,25 @@ export function postRoutes() {
   })
 
   router.delete('/api/posts/:id', (req, res) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return res.status(404).json({ error: 'not found' })
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!mayTouch(req.user, post)) return deny(req, res)
-    posts.remove(post.id)
+    store.posts.remove(post.id, { user: req.user })
     rebuildIfPublic(post, 'post deleted')
     res.status(204).end()
   })
 
   router.post('/api/posts/:id/publish', (req, res) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return res.status(404).json({ error: 'not found' })
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user)) return deny(req, res)
-    const published = posts.setStatus(post.id, 'published', post.published_at || nowSql())
+    const published = store.posts.update(post.id, publishFields(post), { user: req.user, partial: true })
     requestBuild('post published')
     res.json(published)
   })
 
   router.post('/api/posts/:id/unpublish', (req, res) => {
-    const post = posts.get(Number(req.params.id))
-    if (!post) return res.status(404).json({ error: 'not found' })
+    const post = store.posts.get(Number(req.params.id), { user: req.user })
     if (!canPublish(req.user)) return deny(req, res)
-    const draft = posts.setStatus(post.id, 'draft', post.published_at)
+    const draft = store.posts.update(post.id, { status: 'draft' }, { user: req.user, partial: true })
     requestBuild('post unpublished')
     res.json(draft)
   })

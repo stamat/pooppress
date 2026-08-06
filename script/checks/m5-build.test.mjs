@@ -5,9 +5,9 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q, runner, outputDir
+let app, data, q, s, runner, outputDir
 
 // A two-file fixture theme — the real one is M6.
 function writeFixtureTheme(root) {
@@ -38,9 +38,10 @@ before(async () => {
   outputDir = path.join(data.dir, 'output')
   writeFixtureTheme(data.dir)
   q = await import('../../server/queries.js')
+  s = await seed()
   const auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin', display_name: 'Admin' })
-  q.collections.create({ name: 'Blog', slug: 'blog', paginate: 5 })
+  s.collection({ name: 'Blog', slug: 'blog', paginate: 5 })
   q.settings.set('site.title', 'Test Site')
   q.settings.set('site.url', 'https://example.com')
   q.settings.set('theme.active', 'fixture')
@@ -55,13 +56,13 @@ after(async () => {
 
 test('publishing produces the post, the collection index and a sitemap', async (t) => {
   const blog = q.collections.bySlug('blog')
-  q.posts.create({
+  s.post({
     collection_id: blog.id, slug: 'hello-world', title: 'Hello world',
     body_markdown: '## A heading\n\nSome *body* text.',
     status: 'published', published_at: '2024-03-15 10:00:00'
   })
-  q.posts.create({ collection_id: null, slug: 'about', title: 'About', body_markdown: 'About us.', status: 'published', published_at: '2024-03-01 10:00:00' })
-  q.posts.create({ collection_id: blog.id, slug: 'still-a-draft', title: 'Draft', body_markdown: 'nope', status: 'draft' })
+  s.post({ collection_id: null, slug: 'about', title: 'About', body_markdown: 'About us.', status: 'published', published_at: '2024-03-01 10:00:00' })
+  s.post({ collection_id: blog.id, slug: 'still-a-draft', title: 'Draft', body_markdown: 'nope', status: 'draft' })
 
   await runner.runBuild('check')
   assert.equal(runner.buildState.state, 'idle', runner.buildState.error || '')
@@ -86,7 +87,7 @@ test('drafts and future-dated posts never reach output/', async () => {
   assert.equal(existsSync(path.join(outputDir, 'blog', 'still-a-draft.html')), false)
 
   const blog = q.collections.bySlug('blog')
-  q.posts.create({
+  s.post({
     collection_id: blog.id, slug: 'from-the-future', title: 'Future', body_markdown: 'x',
     status: 'published', published_at: '2999-01-01 00:00:00'
   })
@@ -104,7 +105,7 @@ test('uploads are copied into output/ under the same path the admin serves', asy
 
 test('meta.redirect_from becomes a redirect stub', async () => {
   const blog = q.collections.bySlug('blog')
-  q.posts.create({
+  s.post({
     collection_id: blog.id, slug: 'moved', title: 'Moved', body_markdown: 'here now',
     status: 'published', published_at: '2024-04-01 10:00:00',
     meta: { redirect_from: ['/2024/04/old-url'] }
@@ -130,7 +131,7 @@ test('ten rapid saves cause one build, and the queue reports as building', async
 
 test('unpublishing removes the page from output/', async () => {
   const post = q.posts.list({ search: 'Hello world' }).rows[0]
-  q.posts.setStatus(post.id, 'draft', post.published_at)
+  s.store.posts.update(post.id, { status: 'draft' }, { user: s.SYSTEM, partial: true })
   await runner.runBuild('check')
   assert.equal(existsSync(path.join(outputDir, 'blog', 'hello-world.html')), false, 'stale page survived the swap')
   assert.ok(existsSync(path.join(outputDir, 'blog', 'index.html')), 'the rest of the site should still be there')

@@ -3,16 +3,18 @@
 // day of draft edits triggers zero builds.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q, builds
+let app, data, q, s, builds
+const getPost = (id) => s.store.posts.get(Number(id), { user: s.SYSTEM })
 
 before(async () => {
   data = tempDataDir()
   q = await import('../../server/queries.js')
+  s = await seed()
   const auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin', display_name: 'Admin' })
-  q.collections.create({ name: 'Blog', slug: 'blog' })
+  s.collection({ name: 'Blog', slug: 'blog' })
   builds = (await import('../../server/build/runner.js')).buildStats
   app = await startApp()
   await app.form('/admin/login', { email: 'admin@example.com', password: 'pw' })
@@ -43,7 +45,7 @@ test('create → edit → save → list roundtrip without JS', async () => {
     title: 'First post edited', slug: 'first-post', collection_id: String(collection.id),
     body_markdown: '# Hello again', status: 'draft'
   })
-  assert.equal(q.posts.get(Number(id)).title, 'First post edited')
+  assert.equal(getPost(id).title, 'First post edited')
 
   const list = await app.request('/admin/posts')
   assert.ok((await list.text()).includes('First post edited'))
@@ -85,7 +87,7 @@ test('meta key/value rows become the meta JSON column', async () => {
     meta_key: ['featured_image', 'tags'], meta_value: ['/uploads/a.jpg', '["a","b"]']
   })
   const id = Number(created.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
-  const post = q.posts.get(id)
+  const post = getPost(id)
   assert.equal(post.meta.featured_image, '/uploads/a.jpg')
   assert.deepEqual(post.meta.tags, ['a', 'b'], 'JSON-looking values are stored as JSON')
 })
@@ -97,15 +99,15 @@ test('the featured_image field merges into meta and clears when emptied', async 
     featured_image: '/uploads/hero.jpg', meta_key: ['tags'], meta_value: ['["x"]']
   })
   const id = Number(created.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
-  assert.equal(q.posts.get(id).meta.featured_image, '/uploads/hero.jpg')
-  assert.deepEqual(q.posts.get(id).meta.tags, ['x'], 'meta rows survive alongside the featured field')
+  assert.equal(getPost(id).meta.featured_image, '/uploads/hero.jpg')
+  assert.deepEqual(getPost(id).meta.tags, ['x'], 'meta rows survive alongside the featured field')
 
   await app.form(`/admin/posts/${id}`, {
     title: 'With featured', slug: 'with-featured', collection_id: String(collection.id), body_markdown: '',
     featured_image: '', meta_key: ['tags'], meta_value: ['["x"]']
   })
-  assert.equal(q.posts.get(id).meta.featured_image, undefined, 'an emptied field removes the key')
-  assert.deepEqual(q.posts.get(id).meta.tags, ['x'])
+  assert.equal(getPost(id).meta.featured_image, undefined, 'an emptied field removes the key')
+  assert.deepEqual(getPost(id).meta.tags, ['x'])
 })
 
 test('taxonomy fields parse to term arrays and clear when emptied', async () => {
@@ -115,8 +117,8 @@ test('taxonomy fields parse to term arrays and clear when emptied', async () => 
     tags: ' js , Static Site ,js ', categories: 'Notes'
   })
   const id = Number(created.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
-  assert.deepEqual(q.posts.get(id).meta.tags, ['js', 'Static Site'], 'trimmed and de-duped')
-  assert.deepEqual(q.posts.get(id).meta.categories, ['Notes'])
+  assert.deepEqual(getPost(id).meta.tags, ['js', 'Static Site'], 'trimmed and de-duped')
+  assert.deepEqual(getPost(id).meta.categories, ['Notes'])
 
   // the editor shows them back comma-separated and offers what is already in
   // use, so a term doesn't get re-typed three slightly different ways
@@ -130,8 +132,8 @@ test('taxonomy fields parse to term arrays and clear when emptied', async () => 
     title: 'Tagged', slug: 'tagged', collection_id: String(collection.id), body_markdown: '',
     tags: '', categories: 'Notes'
   })
-  assert.equal(q.posts.get(id).meta.tags, undefined, 'an emptied field removes the key')
-  assert.deepEqual(q.posts.get(id).meta.categories, ['Notes'])
+  assert.equal(getPost(id).meta.tags, undefined, 'an emptied field removes the key')
+  assert.deepEqual(getPost(id).meta.categories, ['Notes'])
 })
 
 test('the list filters by term and shows each post\'s terms', async () => {
@@ -175,12 +177,12 @@ test('drafts and autosaves trigger zero builds; publishing triggers one', async 
 
   const published = await app.form(`/admin/posts/${id}/publish`, {})
   assert.equal(published.status, 302)
-  assert.equal(q.posts.get(id).status, 'published')
-  assert.ok(q.posts.get(id).published_at, 'publishing stamps published_at')
+  assert.equal(getPost(id).status, 'published')
+  assert.ok(getPost(id).published_at, 'publishing stamps published_at')
   assert.equal(builds.requested, before + 1)
 
   await app.form(`/admin/posts/${id}/unpublish`, {})
-  assert.equal(q.posts.get(id).status, 'draft')
+  assert.equal(getPost(id).status, 'draft')
   assert.equal(builds.requested, before + 2)
 })
 
@@ -190,7 +192,7 @@ test('deleting a post removes it and requests a build only when it was published
   const id = Number(draft.headers.get('location').match(/\/admin\/posts\/(\d+)/)[1])
   const before = builds.requested
   await app.form(`/admin/posts/${id}/delete`, {})
-  assert.equal(q.posts.get(id), undefined)
+  assert.throws(() => getPost(id), { name: 'NotFoundError' }, 'a deleted post is gone')
   assert.equal(builds.requested, before, 'deleting a draft changes nothing public')
 })
 

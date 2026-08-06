@@ -4,13 +4,14 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q, builds, auth
+let app, data, q, s, builds, auth
 
 before(async () => {
   data = tempDataDir()
   q = await import('../../server/queries.js')
+  s = await seed()
   auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin', display_name: 'Admin' })
   q.users.create({ email: 'author@example.com', password_hash: auth.hashPassword('pw'), role: 'author', display_name: 'Author' })
@@ -62,7 +63,7 @@ test('collections CRUD works and refuses to delete a collection with posts', asy
   await app.form(`/admin/collections/${notes.id}`, { name: 'Field notes', slug: 'notes', sort_order: 'asc' })
   assert.equal(q.collections.get(notes.id).name, 'Field notes')
 
-  q.posts.create({ collection_id: notes.id, slug: 'a-note', title: 'A note' })
+  s.post({ collection_id: notes.id, slug: 'a-note', title: 'A note' })
   const blocked = await app.form(`/admin/collections/${notes.id}/delete`, {})
   assert.equal(blocked.status, 422)
   assert.ok(q.collections.get(notes.id), 'collection with posts must survive')
@@ -133,7 +134,7 @@ test('changing a password drops that user other sessions', async () => {
 
 test('deleting a user keeps their posts but drops their sessions', async () => {
   const editor = q.users.byEmail('editor@example.com')
-  q.posts.create({ slug: 'orphan', title: 'Orphan', author_id: editor.id })
+  s.post({ slug: 'orphan', title: 'Orphan', author_id: editor.id })
   await app.form(`/admin/users/${editor.id}/delete`, {})
   assert.equal(q.users.byEmail('editor@example.com'), undefined)
   const post = q.posts.list({ search: 'Orphan' }).rows[0]

@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { XMLParser } from 'fast-xml-parser'
 import { users, posts, collections, media, settings } from '../queries.js'
+import { store, SYSTEM } from '../db.js'
 import { hashPassword } from '../auth.js'
 import { storeUpload } from '../media.js'
-import { SLUG_RE, slugify } from '../validate.js'
+import { SLUG_RE, slugify, isoUtc } from '../validate.js'
 
 // WordPress statuses → ours. Anything unknown lands as a draft: an import
 // should never publish something the old site didn't.
@@ -75,7 +76,7 @@ export async function importWxr(file, options = {}) {
 
     const existing = posts.bySlug(fields.collection_id, slug)
     if (existing) posts.update(existing.id, { ...existing, ...fields })
-    else posts.create(fields)
+    else store.posts.create({ ...fields, published_at: isoUtc(fields.published_at) }, { user: SYSTEM })
 
     if (isPage) counts.pages++
     else counts.posts++
@@ -86,7 +87,7 @@ export async function importWxr(file, options = {}) {
 }
 
 function ensureCollection(slug) {
-  return collections.bySlug(slug) || collections.create({ name: slug.replace(/(^|-)(\w)/g, (m, d, c) => (d ? ' ' : '') + c.toUpperCase()), slug, paginate: 10 })
+  return collections.bySlug(slug) || store.collections.create({ name: slug.replace(/(^|-)(\w)/g, (m, d, c) => (d ? ' ' : '') + c.toUpperCase()), slug, paginate: 10 }, { user: SYSTEM })
 }
 
 // Imported authors get a locked password: a random value nobody holds, so the
@@ -121,7 +122,7 @@ async function importAttachments(items, authors) {
     if (!url) continue
     const name = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'image')
     // A re-import must not re-download what is already here.
-    const known = media.list({ limit: 1000 }).rows.find((row) => row.original_name === name)
+    const known = media.all().find((row) => row.original_name === name)
     if (known) {
       downloaded.set(url, `/${known.path}`)
       continue
@@ -130,7 +131,7 @@ async function importAttachments(items, authors) {
       const response = await fetch(url)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const buffer = Buffer.from(await response.arrayBuffer())
-      const row = media.create(await storeUpload(buffer, name, authors.values().next().value ?? null))
+      const row = store.media.create(await storeUpload(buffer, name, authors.values().next().value ?? null), { user: SYSTEM })
       downloaded.set(url, `/${row.path}`)
     } catch (err) {
       // A dead attachment URL is normal in an old export — report it and keep

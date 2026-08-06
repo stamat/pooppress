@@ -16,7 +16,7 @@ pooppress/
 │   ├── setup/                 # First-run wizard (creates DB file, admin user)
 │   ├── auth/                  # Session auth, password hashing, roles
 │   ├── routes/                # REST API endpoints
-│   ├── db/                    # SQLite connection + plain SQL queries
+│   ├── db/                    # boot (migrations → septic prepareDb), the store, raw SQL leftovers
 │   ├── migrations/            # Numbered .sql files, applied in order
 │   └── build/                 # DB-to-filesystem bridge, triggers poops
 ├── admin/                     # Admin panel (HAT: htmx + Alpine.js + Tailwind, from stamat/shitstorm-hat)
@@ -89,7 +89,7 @@ Builds are queued — if multiple changes happen in quick succession, they are d
 
 ## Database schema
 
-SQLite via `better-sqlite3`. No ORM — plain SQL. Migrations are numbered `.sql` files applied in order, tracked with `PRAGMA user_version`. Six tables total. Enums are TEXT with CHECK constraints.
+SQLite via [septic](https://github.com/stamat/septic): `server/resources.js` declares the tables below as a septic resource config, and the store it yields does CRUD with validation and per-call access rules. Raw SQL remains for what the store can't say (search, joins, aggregates, clear-to-NULL updates) and for what the config deliberately leaves undeclared (`password_hash`, `sessions`, `settings`). Migrations are numbered `.sql` files applied in order, tracked with `PRAGMA user_version` — septic's schema sync only ever adds, so anything non-additive goes there. Six tables total. Enums are TEXT with CHECK constraints.
 
 ### users
 
@@ -775,7 +775,7 @@ Ceilings: shared-host memory limits can choke builds on large sites (sass + shar
 | Runtime          | Node.js                                                                              | poops is a Node library — build is an in-process `compile()` call. Any other runtime (PHP, etc.) would have to shell out to Node: two runtimes for nothing                                               |
 | Server framework | Express                                                                              | Boring, documented everywhere                                                                                                                                                                            |
 | Database         | SQLite (better-sqlite3)                                                              | Zero config, zero server process, sync API, backup = copy a file                                                                                                                                         |
-| ORM              | None — plain SQL                                                                     | 5 tables. Migrations = numbered .sql files + `PRAGMA user_version`                                                                                                                                       |
+| ORM              | None — septic's store + plain SQL                                                    | septic declares schema/validation/access from one config and does the CRUD; raw SQL keeps search, joins and the undeclared. Migrations = numbered .sql files + `PRAGMA user_version`                      |
 | Admin UI         | HAT stack ([stamat/shitstorm-hat](https://github.com/stamat/shitstorm-hat) template) | Server-rendered nunjucks + htmx partial swaps + Alpine.js sprinkles + Tailwind. Built with poops itself — admin and site share one engine. Styles stay minimal: Tailwind utilities, no component library |
 | Markdown editor  | EasyMDE                                                                              | Interactive: toolbar, shortcuts, side-by-side preview — one script include, zero build. Ceiling: CodeMirror 5 core; swap to CM6 setup if it rots                                                         |
 | Auth             | Sessions (SQLite table) + scrypt (node:crypto)                                       | Stdlib hashing, no bcrypt dep; DB-backed sessions survive restarts, span Passenger workers, and make logout real revocation                                                                              |

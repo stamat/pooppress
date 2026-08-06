@@ -11,7 +11,8 @@ import { collectionRoutes } from './routes/collections.js'
 import { settingsRoutes } from './routes/settings.js'
 import { userRoutes } from './routes/users.js'
 import { ValidationError } from './validate.js'
-import { posts, media, collections, settings } from './queries.js'
+import { settings } from './queries.js'
+import { store } from './db.js'
 import { startScheduler } from './build/scheduler.js'
 
 // Admin templates are rendered per request (htmx swaps need live data), so
@@ -88,11 +89,11 @@ export function createApp() {
   app.get('/admin', (req, res) => res.render('dashboard.html', {
     page: { title: 'Dashboard', nav: 'dashboard' },
     stats: [
-      { label: 'Posts', value: posts.list({ limit: 1 }).total, href: '/admin/posts' },
-      { label: 'Media', value: media.count(), href: '/admin/media' },
-      { label: 'Collections', value: collections.all().length, href: '/admin/collections' }
+      { label: 'Posts', value: store.posts.count({ user: req.user }), href: '/admin/posts' },
+      { label: 'Media', value: store.media.count({ user: req.user }), href: '/admin/media' },
+      { label: 'Collections', value: store.collections.count({ user: req.user }), href: '/admin/collections' }
     ],
-    recent: posts.recent(5)
+    recent: store.posts.list({ user: req.user, sort: 'updated_at', limit: 5 })
   }))
 
   app.use(postRoutes())
@@ -113,6 +114,18 @@ export function createApp() {
     if (err instanceof ValidationError) {
       if (req.originalUrl.startsWith('/api')) return res.status(422).json({ error: err.message, field: err.field })
       return res.status(422).render('error.html', { page: { title: 'Invalid' }, error: err.message })
+    }
+    // The store throws instead of returning undefined; a missing row lands
+    // here and answers exactly like the routers' old not-found paths did.
+    if (err.status === 404) {
+      if (req.originalUrl.startsWith('/api')) return res.status(404).json({ error: 'not found' })
+      return res.status(404).render('404.html', { page: { title: 'Not found' } })
+    }
+    // Remaining septic errors carry .status too (401/403 access, 409 conflict)
+    // — the caller's problem, answered in the caller's format.
+    if (err.status >= 400 && err.status < 500) {
+      if (req.originalUrl.startsWith('/api')) return res.status(err.status).json({ error: err.message })
+      return res.status(err.status).render('error.html', { page: { title: 'Error' }, error: err.message })
     }
     console.error(err)
     if (req.originalUrl.startsWith('/api')) return res.status(500).json({ error: 'server error' })

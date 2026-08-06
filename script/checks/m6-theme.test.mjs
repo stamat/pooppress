@@ -4,15 +4,16 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { tempDataDir } from './helpers.mjs'
+import { tempDataDir, seed } from './helpers.mjs'
 
-let data, q, runner, outputDir
+let data, q, s, runner, outputDir
 
 before(async () => {
   data = tempDataDir()
   outputDir = path.join(data.dir, 'output')
   q = await import('../../server/queries.js')
-  const blog = q.collections.create({ name: 'Blog', slug: 'blog', paginate: 2 })
+  s = await seed()
+  const blog = s.collection({ name: 'Blog', slug: 'blog', paginate: 2 })
   q.settings.set('site.title', 'Fresh Install')
   q.settings.set('site.description', 'A blog about things')
   q.settings.set('site.url', 'https://example.com')
@@ -24,7 +25,7 @@ before(async () => {
     ['third', 'Third post', '2024-03-01 09:00:00']
   ]
   for (const [slug, title, date] of posts) {
-    q.posts.create({
+    s.post({
       collection_id: blog.id, slug, title,
       body_markdown: `# ${title}\n\nBody of ${title} with a [link](https://example.com).`,
       excerpt: `Excerpt of ${title}`,
@@ -34,7 +35,7 @@ before(async () => {
       meta: slug === 'first' ? { tags: ['js'] } : { tags: ['js', 'Static Site'], categories: ['Notes'] }
     })
   }
-  q.posts.create({ collection_id: null, slug: 'about', title: 'About', body_markdown: 'About page.', status: 'published', published_at: '2024-01-01 09:00:00' })
+  s.post({ collection_id: null, slug: 'about', title: 'About', body_markdown: 'About page.', status: 'published', published_at: '2024-01-01 09:00:00' })
 
   runner = await import('../../server/build/runner.js')
   await runner.runBuild('check')

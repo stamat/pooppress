@@ -10,7 +10,7 @@ Companion to [ARCHITECTURE.md](ARCHITECTURE.md). That file says what; this file 
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime         | Node.js ≥ 20, single process                                                                                                                                      |
 | Server          | Express                                                                                                                                                           |
-| Database        | SQLite via better-sqlite3, plain SQL, numbered `.sql` migrations                                                                                                  |
+| Database        | SQLite via [septic](https://github.com/stamat/septic)'s store (schema, CRUD, validation, access from `server/resources.js`); raw SQL for what the store can't say; numbered `.sql` migrations for non-additive changes |
 | Admin UI        | HAT stack from [stamat/shitstorm-hat](https://github.com/stamat/shitstorm-hat): server-rendered nunjucks + htmx partial swaps + Alpine.js sprinkles + Tailwind v4 |
 | Admin styles    | Minimal. Tailwind utilities only, no component library, no custom design system                                                                                   |
 | Markdown editor | EasyMDE — interactive (toolbar, shortcuts, side-by-side preview), one include                                                                                     |
@@ -18,7 +18,7 @@ Companion to [ARCHITECTURE.md](ARCHITECTURE.md). That file says what; this file 
 | Build engine    | poops + poops-images                                                                                                                                              |
 | Hosting targets | All first-class, none required: laptop mode, Docker container, VPS install script (systemd + Caddy), shared hosting via Passenger/cPanel                          |
 
-Full dependency list (server): `express`, `better-sqlite3`, `nunjucks`, `js-yaml`, `poops`, `poops-images`, `multer` (upload parsing). `fast-xml-parser` joins at M9, importer-only. Security adds zero dependencies — all stdlib (see ARCHITECTURE.md §Security model). Admin vendors `htmx`, `alpinejs`, `easymde` as static files; `tailwindcss` is a dev dependency compiled once at admin build time — sites never pay for it.
+Full dependency list (server): `express`, `septic` (data layer — brings `better-sqlite3`), `nunjucks`, `js-yaml`, `poops`, `poops-images`, `multer` (upload parsing). `fast-xml-parser` joins at M9, importer-only. Security adds zero dependencies — all stdlib (see ARCHITECTURE.md §Security model). Admin vendors `htmx`, `alpinejs`, `easymde` as static files; `tailwindcss` is a dev dependency compiled once at admin build time — sites never pay for it.
 
 Anything not in this table gets decided at the milestone that needs it, not before.
 
@@ -31,7 +31,8 @@ pooppress/
 ├── bin/pooppress.js           # CLI entry: init | start | build | deploy | import
 ├── server/
 │   ├── index.js               # Express app, route mounting, session middleware
-│   ├── db.js                  # better-sqlite3 connection + migration runner
+│   ├── db.js                  # boot (migrations → septic prepareDb), the store, raw sql()
+│   ├── resources.js           # the septic config: schema + access rules per table
 │   ├── migrations/            # 001-init.sql, 002-*.sql, ...
 │   ├── auth.js                # scrypt hash/verify, session helpers, role guard
 │   ├── routes/                # one file per resource (posts.js, media.js, ...)
@@ -82,10 +83,10 @@ Milestones ship in order; each ends with a runnable check. Don't start a milesto
 
 ### M1 — Database
 
-- `db.js`: open `data/pooppress.db`, WAL mode, foreign keys on, `busy_timeout = 5000` (Passenger runs several workers against one file)
-- Migration runner: read `migrations/*.sql` sorted, apply those above `PRAGMA user_version`, bump version. ~20 lines, no library
+- `db.js`: boot order is migrations first, then septic's `prepareDb` — `001-init.sql` uses bare `CREATE TABLE`, so on a fresh database pooppress's DDL must land before septic's IF-NOT-EXISTS pass. septic's `openDb` sets the same pragmas this file used to (WAL, foreign keys, `busy_timeout = 5000` for Passenger's several workers)
+- Migration runner: read `migrations/*.sql` sorted, apply those above `PRAGMA user_version`, bump version. ~20 lines, no library. septic only ever adds columns; renames, drops and constraint changes live here
 - `001-init.sql`: users, sessions, posts, collections, media, settings per ARCHITECTURE.md schema — incl. the `COALESCE(collection_id, 0), slug` unique index and the collections `permalink` column
-- Query helpers per table — plain functions returning rows, no ORM, no classes
+- CRUD goes through septic's store (`server/resources.js` declares schema, validation and per-call access); `queries.js` keeps only what the store can't say — search, joins, aggregates, clear-to-NULL updates, and the undeclared: `password_hash`, `sessions`, the id-less `settings` table
 
 **Done when:** `node -e` smoke script inserts a post and reads it back; rerunning migrations is a no-op.
 

@@ -1,14 +1,17 @@
-import Database from 'better-sqlite3'
-import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DATA_DIR, DB_PATH } from './config.js'
+import { openDb, prepareDb, createStore } from 'septic'
+import { DATA_DIR } from './config.js'
+import { septicConfig } from './resources.js'
 
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrations')
 
 // Migrations are numbered files applied in order, tracked with PRAGMA
 // user_version. Append-only once tagged. Returns the files it applied, so
-// "rerunning is a no-op" is observable.
+// "rerunning is a no-op" is observable. septic's schema sync only ever adds
+// (CREATE IF NOT EXISTS, ALTER ADD COLUMN) — renames, drops and constraint
+// changes live here.
 export function migrate(db) {
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
   const current = db.pragma('user_version', { simple: true })
@@ -27,21 +30,43 @@ export function migrate(db) {
 }
 
 let db = null
+let dataStore = null
 
 export function getDb() {
   if (db) return db
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 })
-  db = new Database(DB_PATH)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  db.pragma('busy_timeout = 5000') // Passenger runs several workers against one file
-  migrate(db)
+  // Migrations run before prepareDb: 001-init.sql uses bare CREATE TABLE, so
+  // on a fresh database pooppress's DDL must land first — septic's
+  // IF-NOT-EXISTS pass then no-ops against it. The other order would build
+  // septic-shaped tables and crash the migration.
+  const boot = openDb(septicConfig.dbPath) // WAL, FKs, busy_timeout — the same pragmas this file used to set
+  migrate(boot)
+  boot.close()
+  const prepared = prepareDb(septicConfig)
+  db = prepared.db
+  dataStore = createStore(db, prepared.resources)
   return db
 }
+
+// The septic store: per-call access rules, field validation, reads shaped to
+// declared fields. Lazy for the same reason getDb is — `pooppress --help`
+// must not create data/. Every method takes { user }; omitting it reads as
+// anonymous and fails closed.
+export const store = new Proxy({}, {
+  get(_, resource) {
+    if (!dataStore) getDb()
+    return dataStore[resource]
+  }
+})
+
+// Trusted internal callers — the build bridge, scheduler, setup wizard and
+// WXR import act on their own authority, not a request's.
+export const SYSTEM = { id: 0, role: 'admin' }
 
 export function closeDb() {
   if (db) db.close()
   db = null
+  dataStore = null
   cache.clear() // prepared statements belong to the closed connection
 }
 

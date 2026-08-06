@@ -10,13 +10,11 @@ export const TAXONOMIES = [
   { field: 'tags', path: 'tag', label: 'Tag' }
 ]
 
-export class ValidationError extends Error {
-  constructor(message, field) {
-    super(message)
-    this.field = field
-    this.status = 422
-  }
-}
+// septic's class, so one instanceof catches both a store rejection and a
+// hand-thrown error from the raw-update guards below. Same shape either way:
+// .message, .field, .status 422.
+export { ValidationError } from 'septic'
+import { ValidationError } from 'septic'
 
 // Term names are free text ("Static Site"); this is what turns one into a URL
 // segment. The build owns every term URL it writes, so a theme never slugifies
@@ -61,6 +59,13 @@ export function requireOneOf(value, allowed, field) {
   if (!allowed.includes(value)) throw new ValidationError(`${field} must be one of: ${allowed.join(', ')}`, field)
   return value
 }
+
+// A timestamp crossing INTO the septic store gets its Z back: the store parses
+// an offset-less string in the server's timezone before re-storing as UTC, so
+// our already-UTC "YYYY-MM-DD HH:MM:SS" would shift by the TZ offset. Raw SQL
+// paths keep the plain shape — it IS the storage format.
+export const isoUtc = (ts) =>
+  ts && /^\d{4}-\d{2}-\d{2} /.test(ts) ? `${ts.replace(' ', 'T')}Z` : ts
 
 // datetime-local gives "YYYY-MM-DDTHH:MM"; the database compares timestamps
 // lexicographically, so everything is normalised to "YYYY-MM-DD HH:MM:SS".

@@ -4,6 +4,7 @@ import { media } from '../queries.js'
 import { storeUpload, deleteFiles, regenerateVariants } from '../media.js'
 import { ValidationError } from '../validate.js'
 import { requestBuild } from '../build/runner.js'
+import { store } from '../db.js'
 import { requireAuth } from '../auth.js'
 
 // Memory storage: the file is validated by parsing it before anything is
@@ -28,7 +29,7 @@ export function mediaRoutes() {
   router.post('/admin/media/upload', upload.single('file'), async (req, res, next) => {
     try {
       if (!req.file) throw new ValidationError('No file received.', 'file')
-      const row = media.create(await storeUpload(req.file.buffer, req.file.originalname, req.user.id))
+      const row = store.media.create(await storeUpload(req.file.buffer, req.file.originalname, req.user.id), { user: req.user })
       if (isHtmx(req)) return res.render('media/_grid.html', { picker: false, ...media.list({}) })
       res.redirect(`/admin/media#media-${row.id}`)
     } catch (err) {
@@ -42,8 +43,8 @@ export function mediaRoutes() {
   // outlives a request. ponytail: move onto the build scheduler if it ever does.
   router.post('/admin/media/regenerate', editorOnly, async (req, res, next) => {
     try {
-      for (const row of media.list({ limit: media.count() || 1 }).rows) {
-        media.setVariants(row.id, await regenerateVariants(row))
+      for (const row of media.all()) {
+        store.media.update(row.id, { variants: await regenerateVariants(row) }, { user: req.user, partial: true })
       }
       requestBuild('media variants regenerated')
       res.redirect('/admin/media')
@@ -53,14 +54,13 @@ export function mediaRoutes() {
   })
 
   router.post('/admin/media/:id/delete', editorOnly, (req, res, next) => {
-    const row = media.get(Number(req.params.id))
-    if (!row) return next()
+    const row = store.media.get(Number(req.params.id), { user: req.user })
     try {
       deleteFiles(row)
     } catch (err) {
       return next(err)
     }
-    media.remove(row.id)
+    store.media.remove(row.id, { user: req.user })
     // A deleted image may still be referenced by a published post; the build
     // copies uploads/, so it has to run again.
     requestBuild('media deleted')
@@ -68,9 +68,9 @@ export function mediaRoutes() {
     res.redirect('/admin/media')
   })
 
-  router.post('/admin/media/:id/alt', (req, res, next) => {
-    const row = media.get(Number(req.params.id))
-    if (!row) return next()
+  router.post('/admin/media/:id/alt', (req, res) => {
+    const row = store.media.get(Number(req.params.id), { user: req.user })
+    // Raw setAlt: clearing alt text writes '', which the store reads as "missing".
     media.setAlt(row.id, String(req.body.alt_text || '').slice(0, 500))
     res.redirect('/admin/media')
   })
@@ -81,29 +81,27 @@ export function mediaRoutes() {
   router.get('/api/media', (req, res) => res.json(media.list({ page: req.query.page || 1, limit: Math.min(Math.max(Number(req.query.limit) || 40, 1), 100) })))
 
   router.get('/api/media/:id/variants', (req, res) => {
-    const row = media.get(Number(req.params.id))
-    if (!row) return res.status(404).json({ error: 'not found' })
+    const row = store.media.get(Number(req.params.id), { user: req.user })
     res.json(row.variants)
   })
 
   router.post('/api/media/upload', upload.single('file'), async (req, res, next) => {
     try {
       if (!req.file) throw new ValidationError('No file received.', 'file')
-      res.status(201).json(media.create(await storeUpload(req.file.buffer, req.file.originalname, req.user.id)))
+      res.status(201).json(store.media.create(await storeUpload(req.file.buffer, req.file.originalname, req.user.id), { user: req.user }))
     } catch (err) {
       next(err)
     }
   })
 
   router.delete('/api/media/:id', editorOnly, (req, res, next) => {
-    const row = media.get(Number(req.params.id))
-    if (!row) return res.status(404).json({ error: 'not found' })
+    const row = store.media.get(Number(req.params.id), { user: req.user })
     try {
       deleteFiles(row)
     } catch (err) {
       return next(err)
     }
-    media.remove(row.id)
+    store.media.remove(row.id, { user: req.user })
     requestBuild('media deleted')
     res.status(204).end()
   })

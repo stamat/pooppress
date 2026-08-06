@@ -1,9 +1,11 @@
 // M1 — Database. Done when a post roundtrips and rerunning migrations is a no-op.
+// CRUD goes through the septic store since the data layer moved there; the raw
+// query helpers keep only what the store can't say (search, joins, upserts).
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { tempDataDir } from './helpers.mjs'
+import { tempDataDir, seed } from './helpers.mjs'
 
-let data, db, migrate, q
+let data, db, migrate, q, s
 
 before(async () => {
   data = tempDataDir()
@@ -11,6 +13,7 @@ before(async () => {
   db = mod.getDb()
   migrate = mod.migrate
   q = await import('../../server/queries.js')
+  s = await seed()
 })
 after(() => data.cleanup())
 
@@ -34,10 +37,10 @@ test('pragmas: WAL, foreign keys, busy timeout', () => {
   assert.equal(db.pragma('foreign_keys', { simple: true }), 1)
 })
 
-test('a post roundtrips through the query helpers', () => {
+test('a post roundtrips through the store', () => {
   const user = q.users.create({ email: 'a@example.com', password_hash: 'x', role: 'admin', display_name: 'A' })
-  const collection = q.collections.create({ name: 'Blog', slug: 'blog' })
-  const post = q.posts.create({
+  const collection = s.collection({ name: 'Blog', slug: 'blog' })
+  const post = s.post({
     collection_id: collection.id,
     author_id: user.id,
     slug: 'hello-world',
@@ -45,7 +48,7 @@ test('a post roundtrips through the query helpers', () => {
     body_markdown: '# Hi',
     meta: { tags: ['intro'] }
   })
-  const read = q.posts.get(post.id)
+  const read = s.store.posts.get(post.id, { user: s.SYSTEM })
   assert.equal(read.title, 'Hello world')
   assert.equal(read.body_markdown, '# Hi')
   assert.deepEqual(read.meta, { tags: ['intro'] })
@@ -53,18 +56,20 @@ test('a post roundtrips through the query helpers', () => {
 })
 
 test('slug uniqueness is scoped per collection, and NULL collections collide', () => {
-  const other = q.collections.create({ name: 'Notes', slug: 'notes' })
+  const other = s.collection({ name: 'Notes', slug: 'notes' })
   const blog = q.collections.bySlug('blog')
   // same slug in another collection is fine
-  q.posts.create({ collection_id: other.id, slug: 'hello-world', title: 'Other' })
-  assert.throws(() => q.posts.create({ collection_id: blog.id, slug: 'hello-world', title: 'Dup' }), /UNIQUE/)
+  s.post({ collection_id: other.id, slug: 'hello-world', title: 'Other' })
+  // the store reports the constraint as its ConflictError, a 409
+  assert.throws(() => s.post({ collection_id: blog.id, slug: 'hello-world', title: 'Dup' }), { name: 'ConflictError', status: 409 })
   // two standalone pages with the same slug would overwrite each other at build
-  q.posts.create({ collection_id: null, slug: 'about', title: 'About' })
-  assert.throws(() => q.posts.create({ collection_id: null, slug: 'about', title: 'About again' }), /UNIQUE/)
+  s.post({ collection_id: null, slug: 'about', title: 'About' })
+  assert.throws(() => s.post({ collection_id: null, slug: 'about', title: 'About again' }), { name: 'ConflictError', status: 409 })
 })
 
 test('status is constrained', () => {
-  assert.throws(() => q.posts.create({ slug: 'bad-status', title: 'x', status: 'whatever' }), /CHECK/)
+  // the store rejects a bad enum before SQLite ever sees it
+  assert.throws(() => s.post({ slug: 'bad-status', title: 'x', status: 'whatever' }), { name: 'ValidationError' })
 })
 
 test('settings store JSON values', () => {
@@ -76,7 +81,7 @@ test('settings store JSON values', () => {
 })
 
 test('post list filters by status and search', () => {
-  q.posts.create({ slug: 'findme', title: 'Findable thing', status: 'published', published_at: '2024-01-01 00:00:00' })
+  s.post({ slug: 'findme', title: 'Findable thing', status: 'published', published_at: '2024-01-01 00:00:00' })
   const published = q.posts.list({ status: 'published' })
   assert.ok(published.rows.every((p) => p.status === 'published'))
   const found = q.posts.list({ search: 'Findable' })

@@ -5,9 +5,9 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
-import { tempDataDir, startApp } from './helpers.mjs'
+import { tempDataDir, startApp, seed } from './helpers.mjs'
 
-let app, data, q, uploadsDir
+let app, data, q, s, uploadsDir
 
 const jpeg = () => sharp({ create: { width: 1200, height: 800, channels: 3, background: '#3366ff' } }).jpeg().toBuffer()
 
@@ -21,6 +21,7 @@ before(async () => {
   data = tempDataDir()
   uploadsDir = path.join(data.dir, 'uploads')
   q = await import('../../server/queries.js')
+  s = await seed()
   const auth = await import('../../server/auth.js')
   q.users.create({ email: 'admin@example.com', password_hash: auth.hashPassword('pw'), role: 'admin' })
   app = await startApp()
@@ -85,7 +86,7 @@ test('regenerate rebuilds missing variants and updates the row', async () => {
   const res = await app.form('/admin/media/regenerate', {})
   assert.equal(res.status, 302)
 
-  const after = q.media.get(row.id)
+  const after = s.store.media.get(row.id, { user: s.SYSTEM })
   assert.ok(after.variants.length > 0, 'regenerate produced no variants')
   for (const v of after.variants) {
     assert.ok(existsSync(path.join(data.dir, v.path)), `missing regenerated variant ${v.path}`)
@@ -97,12 +98,12 @@ test('deleting media removes the row, the original and every variant', async () 
   const files = [row.path, ...row.variants.map((v) => v.path)]
   const res = await app.form(`/admin/media/${row.id}/delete`, {})
   assert.equal(res.status, 302)
-  assert.equal(q.media.get(row.id), undefined)
+  assert.throws(() => s.store.media.get(row.id, { user: s.SYSTEM }), { name: 'NotFoundError' }, 'a deleted row is gone')
   for (const file of files) assert.equal(existsSync(path.join(data.dir, file)), false, `${file} survived`)
 })
 
 test('media paths that escape the uploads directory are refused', async () => {
-  const evil = q.media.create({
+  const evil = s.media({
     original_name: 'evil', path: '../../etc/passwd', mime_type: 'image/jpeg', size_bytes: 1
   })
   const res = await app.form(`/admin/media/${evil.id}/delete`, {})

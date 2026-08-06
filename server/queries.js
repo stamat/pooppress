@@ -1,32 +1,47 @@
-// Plain functions over plain SQL. No ORM, no classes. JSON columns (post.meta,
-// media.variants, settings.value) are parsed on the way out and stringified on
-// the way in, so callers only ever see objects.
+// What SQL remains after the septic store took the plain CRUD. Two things keep
+// a query here, and each entry names its reason:
+//
+// - the store cannot express it — LIKE search, json_each taxonomy filters,
+//   multi-table joins, aggregates, two-key ordering, upsert-by-key, and any
+//   update that must write NULL or '' (septic's validation reads both as
+//   "missing" and skips the field, so a clear-to-empty never reaches the row);
+// - it touches what the config deliberately leaves undeclared — password_hash,
+//   the sessions table, the id-less settings table.
+//
+// Everything else goes through `store` from db.js, which enforces access and
+// validation per call. JSON columns are parsed on the way out and stringified
+// on the way in, so callers only ever see objects — same shape the store's
+// hydrated reads have.
 import { sql, likeEscape, nowSql } from './db.js'
 
 const parsePost = (row) => row && { ...row, meta: JSON.parse(row.meta || '{}') }
 const parseMedia = (row) => row && { ...row, variants: JSON.parse(row.variants || '[]') }
 
 export const users = {
+  // password_hash is undeclared in resources.js, so creating a user with a
+  // credential has to happen here.
   create ({ email, password_hash, role = 'author', display_name = '' }) {
     const info = sql('INSERT INTO users (email, password_hash, role, display_name) VALUES (?, ?, ?, ?)')
       .run(email.toLowerCase().trim(), password_hash, role, display_name)
-    return users.get(info.lastInsertRowid)
+    return sql('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)
   },
-  get: (id) => sql('SELECT * FROM users WHERE id = ?').get(id),
+  // Login needs the hash; store reads never carry it.
   byEmail: (email) => sql('SELECT * FROM users WHERE email = ?').get(String(email).toLowerCase().trim()),
-  all: () => sql('SELECT * FROM users ORDER BY display_name, email').all(),
   count: () => sql('SELECT COUNT(*) AS n FROM users').get().n,
   updatePassword (id, password_hash) {
     sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, nowSql(), id)
   },
+  // Raw because clearing display_name means writing '' — the store would read
+  // '' as "missing" and leave the old value in place.
   update (id, { email, role, display_name }) {
     sql('UPDATE users SET email = COALESCE(?, email), role = COALESCE(?, role), display_name = COALESCE(?, display_name), updated_at = ? WHERE id = ?')
       .run(email ? email.toLowerCase().trim() : null, role ?? null, display_name ?? null, nowSql(), id)
-    return users.get(id)
-  },
-  remove: (id) => sql('DELETE FROM users WHERE id = ?').run(id)
+    return sql('SELECT * FROM users WHERE id = ?').get(id)
+  }
 }
 
+// The whole table is app-owned: septic's own sessions are stateless cookies,
+// and pooppress keeps a table exactly for what those can't do — revocation.
 export const sessions = {
   create: (token_hash, user_id, expires_at) =>
     sql('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(token_hash, user_id, expires_at),
@@ -43,17 +58,17 @@ export const sessions = {
 }
 
 export const collections = {
-  create ({ name, slug, sort_by = 'published_at', sort_order = 'desc', paginate = null, permalink = null, layout = 'post', index_layout = 'collection' }) {
-    const info = sql(`INSERT INTO collections (name, slug, sort_by, sort_order, paginate, permalink, layout, index_layout)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(name, slug, sort_by, sort_order, paginate, permalink, layout, index_layout)
-    return collections.get(info.lastInsertRowid)
-  },
+  // Existence pre-checks in validation and the raw update path — contexts
+  // where the store's get would demand a user that none belongs to.
   get: (id) => sql('SELECT * FROM collections WHERE id = ?').get(id),
-  bySlug: (slug) => sql('SELECT * FROM collections WHERE slug = ?').get(slug),
+  // Unbounded on purpose — the build bridge and the post editor want every
+  // collection, and the store's list wants a limit.
   all: () => sql('SELECT * FROM collections ORDER BY name').all(),
+  bySlug: (slug) => sql('SELECT * FROM collections WHERE slug = ?').get(slug),
   withCounts: () => sql(`
     SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id) AS post_count
     FROM collections c ORDER BY c.name`).all(),
+  // Raw because paginate and permalink are cleared by writing NULL.
   update (id, fields) {
     const { name, slug, sort_by, sort_order, paginate, permalink, layout, index_layout } = fields
     sql(`UPDATE collections SET
@@ -63,22 +78,16 @@ export const collections = {
       WHERE id = ?`)
       .run(name ?? null, slug ?? null, sort_by ?? null, sort_order ?? null,
         paginate ?? null, permalink ?? null, layout ?? null, index_layout ?? null, nowSql(), id)
-    return collections.get(id)
-  },
-  remove: (id) => sql('DELETE FROM collections WHERE id = ?').run(id)
+    return sql('SELECT * FROM collections WHERE id = ?').get(id)
+  }
 }
 
 export const posts = {
-  create ({ collection_id = null, author_id = null, slug, title = '', body_markdown = '', excerpt = null, status = 'draft', published_at = null, meta = {} }) {
-    const info = sql(`INSERT INTO posts (collection_id, author_id, slug, title, body_markdown, excerpt, status, published_at, meta)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(collection_id, author_id, slug, title, body_markdown, excerpt, status, published_at, JSON.stringify(meta ?? {}))
-    return posts.get(info.lastInsertRowid)
-  },
-  get: (id) => parsePost(sql('SELECT * FROM posts WHERE id = ?').get(id)),
   // COALESCE mirrors idx_posts_slug, so "same slug, no collection" is one row.
   bySlug: (collection_id, slug) => parsePost(
     sql('SELECT * FROM posts WHERE COALESCE(collection_id, 0) = COALESCE(?, 0) AND slug = ?').get(collection_id ?? null, slug)),
+  // Raw because collection_id, excerpt and published_at are cleared by writing
+  // NULL — unscheduling a post is exactly that write.
   update (id, fields) {
     const { collection_id, slug, title, body_markdown, excerpt, status, published_at, meta } = fields
     sql(`UPDATE posts SET
@@ -89,13 +98,8 @@ export const posts = {
       .run(collection_id ?? null, slug ?? null, title ?? null, body_markdown ?? null,
         excerpt ?? null, status ?? null, published_at ?? null,
         meta === undefined ? null : JSON.stringify(meta), nowSql(), id)
-    return posts.get(id)
+    return parsePost(sql('SELECT * FROM posts WHERE id = ?').get(id))
   },
-  setStatus (id, status, published_at) {
-    sql('UPDATE posts SET status = ?, published_at = ?, updated_at = ? WHERE id = ?').run(status, published_at ?? null, nowSql(), id)
-    return posts.get(id)
-  },
-  remove: (id) => sql('DELETE FROM posts WHERE id = ?').run(id),
 
   // Admin listing: filters + LIKE search, at most a few thousand rows.
   // Ceiling: swap LIKE for FTS5 when it gets slow, not before.
@@ -144,9 +148,6 @@ export const posts = {
     WHERE json_type(posts.meta, ?) IS NOT NULL ORDER BY term`)
     .all(`$."${field}"`, `$."${field}"`).map((row) => String(row.term)),
 
-  recent: (limit = 5) => sql('SELECT * FROM posts ORDER BY updated_at DESC LIMIT ?').all(limit).map(parsePost),
-  countByStatus: () => sql('SELECT status, COUNT(*) AS n FROM posts GROUP BY status').all(),
-
   // The build's one source of truth for what is public.
   published: () => sql(`
     SELECT p.*, c.slug AS collection_slug, c.name AS collection_name, c.permalink, c.layout AS collection_layout,
@@ -176,26 +177,23 @@ export const posts = {
 }
 
 export const media = {
-  create ({ uploaded_by = null, original_name, path, mime_type, size_bytes, width = null, height = null, alt_text = '', variants = [] }) {
-    const info = sql(`INSERT INTO media (uploaded_by, original_name, path, mime_type, size_bytes, width, height, alt_text, variants)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(uploaded_by, original_name, path, mime_type, size_bytes, width, height, alt_text, JSON.stringify(variants))
-    return media.get(info.lastInsertRowid)
-  },
-  get: (id) => parseMedia(sql('SELECT * FROM media WHERE id = ?').get(id)),
-  setVariants: (id, variants) => sql('UPDATE media SET variants = ? WHERE id = ?').run(JSON.stringify(variants), id),
-  setAlt: (id, alt_text) => sql('UPDATE media SET alt_text = ? WHERE id = ?').run(alt_text, id),
+  // Unbounded on purpose — variant regeneration and the WXR import walk every
+  // row.
+  all: () => sql('SELECT * FROM media').all().map(parseMedia),
+  // Two-key order: created_at ties are broken by id, which the store's
+  // single-column sort can't promise.
   list ({ page = 1, limit = 40 } = {}) {
     const total = sql('SELECT COUNT(*) AS n FROM media').get().n
     const rows = sql('SELECT * FROM media ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?')
       .all(limit, (Math.max(1, Number(page)) - 1) * limit).map(parseMedia)
     return { rows, total, page: Math.max(1, Number(page)), pages: Math.max(1, Math.ceil(total / limit)) }
   },
-  all: () => sql('SELECT * FROM media').all().map(parseMedia),
-  remove: (id) => sql('DELETE FROM media WHERE id = ?').run(id),
-  count: () => sql('SELECT COUNT(*) AS n FROM media').get().n
+  // Raw because clearing alt text writes ''.
+  setAlt: (id, alt_text) => sql('UPDATE media SET alt_text = ? WHERE id = ?').run(alt_text, id)
 }
 
+// The table has a TEXT primary key and no id column, which the store cannot
+// address; the upsert stays SQL.
 export const settings = {
   get (key, fallback = undefined) {
     const row = sql('SELECT value FROM settings WHERE key = ?').get(key)

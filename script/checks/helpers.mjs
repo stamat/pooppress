@@ -11,6 +11,22 @@ export function tempDataDir() {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
+// Data seeding for checks: the septic store under SYSTEM authority. Seeded
+// published_at timestamps get their Z back via isoUtc — a bare
+// "YYYY-MM-DD HH:MM:SS" would shift through the store's local-time parse and
+// make a check pass or fail with the machine's timezone.
+export async function seed() {
+  const { store, SYSTEM } = await import('../../server/db.js')
+  const { isoUtc } = await import('../../server/validate.js')
+  return {
+    store,
+    SYSTEM,
+    post: (f) => store.posts.create({ ...f, published_at: isoUtc(f.published_at) }, { user: SYSTEM }),
+    collection: (f) => store.collections.create(f, { user: SYSTEM }),
+    media: (f) => store.media.create(f, { user: SYSTEM })
+  }
+}
+
 // Boots the app on port 0 and returns { url, close, cookieFetch }.
 export async function startApp() {
   const { createApp } = await import('../../server/index.js')

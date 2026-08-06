@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline/promises'
 import { mkdirSync, existsSync, chmodSync } from 'node:fs'
 import path from 'node:path'
 import { DATA_DIR, SITE_ROOT, PORT, themeDir } from './config.js'
-import { getDb } from './db.js'
+import { getDb, store, SYSTEM } from './db.js'
 import { users, collections, settings } from './queries.js'
 import { hashPassword } from './auth.js'
 
@@ -27,7 +27,7 @@ export async function initSite({ title, url = '', description = '', email, passw
   settings.set('plugins.active', [])
 
   if (!collections.bySlug('blog')) {
-    collections.create({ name: 'Blog', slug: 'blog', paginate: 10 })
+    store.collections.create({ name: 'Blog', slug: 'blog', paginate: 10 }, { user: SYSTEM })
   }
 
   // No .env: PORT comes from the environment (systemd unit, Passenger, shell)
