@@ -40,9 +40,9 @@
     "js-yaml": "^4.1.0",
     "multer": "^2.0.2",
     "nunjucks": "^3.2.4",
-    "poops": "^2.0.0",
+    "poops": "^2.2.0",
     "poops-images": "^1.2.1",
-    "septic": "^3.0.0",
+    "septic": "^3.2.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {
