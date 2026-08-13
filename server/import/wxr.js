@@ -75,7 +75,7 @@ export async function importWxr(file, options = {}) {
     }
 
     const existing = posts.bySlug(fields.collection_id, slug)
-    if (existing) posts.update(existing.id, { ...existing, ...fields })
+    if (existing) store.posts.update(existing.id, { ...existing, ...fields }, { user: SYSTEM })
     else store.posts.create({ ...fields, published_at: isoUtc(fields.published_at) }, { user: SYSTEM })
 
     if (isPage) counts.pages++

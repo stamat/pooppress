@@ -70,8 +70,9 @@ export function mediaRoutes() {
 
   router.post('/admin/media/:id/alt', (req, res) => {
     const row = store.media.get(Number(req.params.id), { user: req.user })
-    // Raw setAlt: clearing alt text writes '', which the store reads as "missing".
-    media.setAlt(row.id, String(req.body.alt_text || '').slice(0, 500))
+    // The whole row goes back: a store update without `partial` clears what it
+    // is not given, and original_name/path are required.
+    store.media.update(row.id, { ...row, alt_text: String(req.body.alt_text || '').slice(0, 500) }, { user: req.user })
     res.redirect('/admin/media')
   })
 

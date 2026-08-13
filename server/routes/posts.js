@@ -89,9 +89,11 @@ function fieldsFromBody(rawBody, { partial = false } = {}) {
   return fields
 }
 
-// A constraint failure is a user error (422), not a 500. It arrives as
-// septic's ConflictError from a store create — 409 for a duplicate, 422 for a
-// dangling reference — and as a raw SQLite failure from the raw update path.
+// A constraint failure is a user error (422), not a 500. It arrives as septic's
+// ConflictError — 409 for a duplicate, 422 for a dangling reference — from
+// every write now that they all go through the store. The raw-SQLite branch
+// below stays for the constraints septic does not map: the CHECK on status is
+// the one this schema has.
 function asValidationError(err) {
   if (err instanceof ConflictError) {
     return err.status === 409
@@ -195,7 +197,7 @@ export function postRoutes() {
       const fields = fieldsFromBody(req.body, { partial })
       if (partial) delete fields.status
       guardStatus(req.user, fields)
-      const post = posts.update(existing.id, { ...existing, ...fields })
+      const post = store.posts.update(existing.id, { ...existing, ...fields }, { user: req.user })
       if (!partial) rebuildIfPublic(post, 'post updated')
       if (partial) return res.status(204).end()
       if (isHtmx(req)) return res.status(204).set('HX-Redirect', `/admin/posts/${post.id}`).end()
@@ -279,7 +281,7 @@ export function postRoutes() {
     try {
       const fields = fieldsFromBody(req.body, { partial: true })
       guardStatus(req.user, fields)
-      const post = posts.update(existing.id, { ...existing, ...fields })
+      const post = store.posts.update(existing.id, { ...existing, ...fields }, { user: req.user })
       if (post.status === 'published' || existing.status === 'published') requestBuild('post updated')
       res.json(post)
     } catch (err) {

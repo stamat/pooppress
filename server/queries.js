@@ -2,11 +2,14 @@
 // a query here, and each entry names its reason:
 //
 // - the store cannot express it — LIKE search, json_each taxonomy filters,
-//   multi-table joins, aggregates, two-key ordering, upsert-by-key, and any
-//   update that must write NULL or '' (septic's validation reads both as
-//   "missing" and skips the field, so a clear-to-empty never reaches the row);
+//   multi-table joins, aggregates, two-key ordering, upsert-by-key;
 // - it touches what the config deliberately leaves undeclared — password_hash,
 //   the sessions table, the id-less settings table.
+//
+// Writing an empty value is no longer one of them: a store update without
+// `partial` is a whole-row edit, and clears a field that arrives blank — '' for
+// the text types, NULL for the rest. That is what retired the COALESCE updates
+// this file used to carry for posts, collections, users and media alt text.
 //
 // Everything else goes through `store` from db.js, which enforces access and
 // validation per call. JSON columns are parsed on the way out and stringified
@@ -30,13 +33,6 @@ export const users = {
   count: () => sql('SELECT COUNT(*) AS n FROM users').get().n,
   updatePassword (id, password_hash) {
     sql('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(password_hash, nowSql(), id)
-  },
-  // Raw because clearing display_name means writing '' — the store would read
-  // '' as "missing" and leave the old value in place.
-  update (id, { email, role, display_name }) {
-    sql('UPDATE users SET email = COALESCE(?, email), role = COALESCE(?, role), display_name = COALESCE(?, display_name), updated_at = ? WHERE id = ?')
-      .run(email ? email.toLowerCase().trim() : null, role ?? null, display_name ?? null, nowSql(), id)
-    return sql('SELECT * FROM users WHERE id = ?').get(id)
   }
 }
 
@@ -67,39 +63,13 @@ export const collections = {
   bySlug: (slug) => sql('SELECT * FROM collections WHERE slug = ?').get(slug),
   withCounts: () => sql(`
     SELECT c.*, (SELECT COUNT(*) FROM posts p WHERE p.collection_id = c.id) AS post_count
-    FROM collections c ORDER BY c.name`).all(),
-  // Raw because paginate and permalink are cleared by writing NULL.
-  update (id, fields) {
-    const { name, slug, sort_by, sort_order, paginate, permalink, layout, index_layout } = fields
-    sql(`UPDATE collections SET
-      name = COALESCE(?, name), slug = COALESCE(?, slug), sort_by = COALESCE(?, sort_by),
-      sort_order = COALESCE(?, sort_order), paginate = ?, permalink = ?,
-      layout = COALESCE(?, layout), index_layout = COALESCE(?, index_layout), updated_at = ?
-      WHERE id = ?`)
-      .run(name ?? null, slug ?? null, sort_by ?? null, sort_order ?? null,
-        paginate ?? null, permalink ?? null, layout ?? null, index_layout ?? null, nowSql(), id)
-    return sql('SELECT * FROM collections WHERE id = ?').get(id)
-  }
+    FROM collections c ORDER BY c.name`).all()
 }
 
 export const posts = {
   // COALESCE mirrors idx_posts_slug, so "same slug, no collection" is one row.
   bySlug: (collection_id, slug) => parsePost(
     sql('SELECT * FROM posts WHERE COALESCE(collection_id, 0) = COALESCE(?, 0) AND slug = ?').get(collection_id ?? null, slug)),
-  // Raw because collection_id, excerpt and published_at are cleared by writing
-  // NULL — unscheduling a post is exactly that write.
-  update (id, fields) {
-    const { collection_id, slug, title, body_markdown, excerpt, status, published_at, meta } = fields
-    sql(`UPDATE posts SET
-      collection_id = ?, slug = COALESCE(?, slug), title = COALESCE(?, title),
-      body_markdown = COALESCE(?, body_markdown), excerpt = ?, status = COALESCE(?, status),
-      published_at = ?, meta = COALESCE(?, meta), updated_at = ?
-      WHERE id = ?`)
-      .run(collection_id ?? null, slug ?? null, title ?? null, body_markdown ?? null,
-        excerpt ?? null, status ?? null, published_at ?? null,
-        meta === undefined ? null : JSON.stringify(meta), nowSql(), id)
-    return parsePost(sql('SELECT * FROM posts WHERE id = ?').get(id))
-  },
 
   // Admin listing: filters + LIKE search, at most a few thousand rows.
   // Ceiling: swap LIKE for FTS5 when it gets slow, not before.
@@ -187,9 +157,7 @@ export const media = {
     const rows = sql('SELECT * FROM media ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?')
       .all(limit, (Math.max(1, Number(page)) - 1) * limit).map(parseMedia)
     return { rows, total, page: Math.max(1, Number(page)), pages: Math.max(1, Math.ceil(total / limit)) }
-  },
-  // Raw because clearing alt text writes ''.
-  setAlt: (id, alt_text) => sql('UPDATE media SET alt_text = ? WHERE id = ?').run(alt_text, id)
+  }
 }
 
 // The table has a TEXT primary key and no id column, which the store cannot

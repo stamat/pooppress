@@ -86,7 +86,7 @@ Milestones ship in order; each ends with a runnable check. Don't start a milesto
 - `db.js`: boot order is migrations first, then septic's `prepareDb` — `001-init.sql` uses bare `CREATE TABLE`, so on a fresh database pooppress's DDL must land before septic's IF-NOT-EXISTS pass. septic's `openDb` sets the same pragmas this file used to (WAL, foreign keys, `busy_timeout = 5000` for Passenger's several workers)
 - Migration runner: read `migrations/*.sql` sorted, apply those above `PRAGMA user_version`, bump version. ~20 lines, no library. septic only ever adds columns; renames, drops and constraint changes live here
 - `001-init.sql`: users, sessions, posts, collections, media, settings per ARCHITECTURE.md schema — incl. the `COALESCE(collection_id, 0), slug` unique index and the collections `permalink` column
-- CRUD goes through septic's store (`server/resources.js` declares schema, validation and per-call access); `queries.js` keeps only what the store can't say — search, joins, aggregates, clear-to-NULL updates, and the undeclared: `password_hash`, `sessions`, the id-less `settings` table
+- CRUD goes through septic's store (`server/resources.js` declares schema, validation and per-call access); `queries.js` keeps only what the store can't say — search, joins, aggregates — and the undeclared: `password_hash`, `sessions`, the id-less `settings` table. Clearing a field is a store call too: an update without `partial` is the whole row, and empties what arrives blank
 
 **Done when:** `node -e` smoke script inserts a post and reads it back; rerunning migrations is a no-op.
 

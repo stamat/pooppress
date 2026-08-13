@@ -89,7 +89,7 @@ Builds are queued — if multiple changes happen in quick succession, they are d
 
 ## Database schema
 
-SQLite via [septic](https://github.com/stamat/septic): `server/resources.js` declares the tables below as a septic resource config, and the store it yields does CRUD with validation and per-call access rules. Raw SQL remains for what the store can't say (search, joins, aggregates, clear-to-NULL updates) and for what the config deliberately leaves undeclared (`password_hash`, `sessions`, `settings`). Migrations are numbered `.sql` files applied in order, tracked with `PRAGMA user_version` — septic's schema sync only ever adds, so anything non-additive goes there. Six tables total. Enums are TEXT with CHECK constraints.
+SQLite via [septic](https://github.com/stamat/septic): `server/resources.js` declares the tables below as a septic resource config, and the store it yields does CRUD with validation and per-call access rules. Raw SQL remains for what the store can't say (search, joins, aggregates) and for what the config deliberately leaves undeclared (`password_hash`, `sessions`, `settings`). Clearing a field is not among them: a store update without `partial` is a whole-row edit and empties what arrives blank — `''` for the text columns the schema declares `NOT NULL DEFAULT ''`, `NULL` for the rest. Migrations are numbered `.sql` files applied in order, tracked with `PRAGMA user_version` — septic's schema sync only ever adds, so anything non-additive goes there. Six tables total. Enums are TEXT with CHECK constraints.
 
 ### users
 

@@ -50,7 +50,7 @@ export function collectionRoutes() {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return next()
     try {
-      collections.update(collection.id, fieldsFromBody(req.body))
+      store.collections.update(collection.id, fieldsFromBody(req.body), { user: req.user })
       requestBuild('collection updated')
       res.redirect('/admin/collections')
     } catch (err) {
@@ -81,7 +81,7 @@ export function collectionRoutes() {
   router.put('/api/collections/:id', editorOnly, (req, res) => {
     const collection = collections.get(Number(req.params.id))
     if (!collection) return res.status(404).json({ error: 'not found' })
-    const updated = collections.update(collection.id, fieldsFromBody(req.body))
+    const updated = store.collections.update(collection.id, fieldsFromBody(req.body), { user: req.user })
     requestBuild('collection updated')
     res.json(updated)
   })

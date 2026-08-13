@@ -19,6 +19,19 @@ function validEmail(value) {
   return email
 }
 
+// A store update without `partial` is the whole row: what the body does not
+// carry comes off the stored user, so an edit of one field leaves the rest
+// standing and the required email is always present. An empty display_name is
+// kept as '' rather than dropped — clearing it is a thing an admin may do, and
+// the column is NOT NULL.
+function userFields (stored, body) {
+  const fields = { ...stored }
+  if (body.email) fields.email = validEmail(body.email)
+  if (body.role) fields.role = requireOneOf(String(body.role), ROLES, 'role')
+  if (body.display_name !== undefined) fields.display_name = String(body.display_name).trim()
+  return fields
+}
+
 function checkPassword(value) {
   const password = String(value || '')
   if (password.length < 8) throw new ValidationError('Passwords must be at least 8 characters.', 'password')
@@ -48,12 +61,10 @@ export function userRoutes() {
   router.post('/admin/users/:id', adminOnly, (req, res) => {
     const user = store.users.get(Number(req.params.id), { user: req.user })
     try {
-      if (req.body.email || req.body.role || req.body.display_name) {
-        users.update(user.id, {
-          email: req.body.email ? validEmail(req.body.email) : undefined,
-          role: req.body.role ? requireOneOf(String(req.body.role), ROLES, 'role') : undefined,
-          display_name: req.body.display_name
-        })
+      // display_name tested for presence, not truth: '' is how the form clears
+      // it, and the falsy test skipped the save that would have.
+      if (req.body.email || req.body.role || req.body.display_name !== undefined) {
+        store.users.update(user.id, userFields(user, req.body), { user: req.user })
       }
       if (req.body.password) {
         users.updatePassword(user.id, hashPassword(checkPassword(req.body.password)))
@@ -94,11 +105,7 @@ export function userRoutes() {
       users.updatePassword(user.id, hashPassword(checkPassword(req.body.password)))
       sessions.removeForUser(user.id)
     }
-    const updated = users.update(user.id, {
-      email: req.body.email ? validEmail(req.body.email) : undefined,
-      role: req.body.role ? requireOneOf(String(req.body.role), ROLES, 'role') : undefined,
-      display_name: req.body.display_name
-    })
+    const updated = store.users.update(user.id, userFields(user, req.body), { user: req.user })
     res.json(publicUser(updated))
   })
 
